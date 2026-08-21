@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Companion for Chrono Divide — map guides</title>
+    <link rel="stylesheet" href="options.css" />
+    <!-- The sprite alignment instrument: a developer surface, dropped from the
+         public build together with its script (see .publish.json). -->
+    <!-- The report's own look, in its own file because the published site draws
+         the same report from the same two files. -->
+    <link rel="stylesheet" href="replay-view.css" />
+  </head>
+  <body>
+    <!-- The tabs read first and sit at the left margin; the title is what is
+         pushed to the far end. The heading still comes first in the markup —
+         the swap is a `flex` order, not a reordering of the document, so the
+         page still opens with its own name. -->
+    <header class="topbar">
+      <h1>Companion for Chrono Divide</h1>
+      <!-- Filled by options.js from the same list the panels are built from, so
+           a tab and its panel cannot disagree about what exists. -->
+      <nav id="tabs" class="tabs" role="tablist" aria-label="Sections"></nav>
+    </header>
+
+    <!-- One ladder panel per ranked ladder, cloned from here rather than
+         written out twice: the two are the same instrument pointed at different
+         pools, and a second copy in the markup is a second copy to keep in step.
+         Hooks are classes, not ids — two clones of an id is one element as far
+         as `getElementById` is concerned. -->
+    <template id="ladderTpl">
+      <!-- Collapsible: the pool is set up once and then read back rarely, while
+           the guides under it are the thing you keep coming back to. Its summary
+           carries the sample's own readout, so what the pool is a claim about —
+           how many maps are ticked, over which period — is legible without
+           opening it. -->
+      <details class="align poolbox">
+        <summary>Ladder maps <span class="poolInfo count"></span></summary>
+
+        <div class="alignbar">
+          <label class="opt" title="Which realm's ladder to read. A player's match history lives in the realm they play, so the pool is read per realm rather than merged.">
+            Realm
+            <select class="poolRealm"></select>
+          </label>
+          <button class="poolFind" type="button">Find ladder maps</button>
+          <button class="poolRender" type="button" title="Renders every ticked map that is missing or made by an older renderer. This page has no game client and cannot render, so the work happens in a game tab — one that is already open, or one the extension opens in the background and closes when the run ends.">Render ticked</button>
+          <button class="poolAll linkbtn" type="button" title="Tick every map in the sample.">Select all</button>
+          <button class="poolNone linkbtn" type="button" title="Untick every map in the sample. The sample itself stays.">Clear selection</button>
+          <!-- Named for what it deletes: it used to say "Clear", next to a set of
+               ticks it does not touch and a set of renders it does not touch. -->
+          <button class="poolClear linkbtn" type="button" title="Deletes this ladder's sampled pool and its ticks. Renders, guides and the map list stay.">Clear sampled pool</button>
+          <span class="poolStatus alignhint"></span>
+        </div>
+
+        <p class="lede">
+          Nothing publishes the ranked map pool, so it is measured: a slice of the
+          ladder, each player's recent matches, and the maps that come back. Untick
+          anything you do not want rendered.
+        </p>
+
+        <div class="poollist"></div>
+        <p class="poolEmpty empty" hidden></p>
+      </details>
+
+      <!-- Sticky: this bar is the list's controls, and a filter you have to
+           scroll back up to reach is a filter for the first screen only. It
+           holds one line for that reason — the prose that used to close it is in
+           the help tooltip. -->
+      <div class="listbar">
+        <h2>
+          Map guides
+          <span class="help" tabindex="0" role="note" aria-label="About the guides">?
+            <span class="tip">
+              Written here, shown on the loading screen and under the preview in
+              game. Edits reach a running game immediately. Click a preview to see
+              it full size. Only this ladder's maps are listed — a map is a card
+              here once it has been rendered or played.
+            </span>
+          </span>
+        </h2>
+        <input class="filter" type="search" placeholder="filter by map name" />
+        <span class="count mapCount"></span>
+        <!-- Both are about this page and nothing else. They used to be one
+             setting shared with the game, which read as a page control that
+             silently reached into the overlay; the in-game half now has its own
+             on the Overlay settings tab. -->
+        <label class="opt" title="This page only — these cards and the viewer a click opens. Our render is drawn from the map's cell data with the game's own art; the map's own preview is a couple of pixels per cell. Only the default here: each card can be set to one or the other on its own. What the game shows is on the Overlay settings tab.">
+          <input class="useOriginal" type="checkbox" />
+          Show the map's own preview on cards
+        </label>
+        <label class="opt" title="This page only — the pictograms on the full-size render the viewer opens: a droplet for an oil derrick, a parachute for an airport. They are drawn over the picture rather than into it, so this takes effect at once, without re-rendering anything. The same marks in game are on the Overlay settings tab.">
+          <input class="fullIcons" type="checkbox" />
+          Mark tech buildings in the viewer
+        </label>
+        <button class="clearRenders linkbtn" type="button" title="Renders are megabytes each. Clearing them keeps the guides and the map list.">Clear renders</button>
+        <!-- What the extension is actually using, and how much of that is this
+             ladder's. A run whose last writes failed says nothing about why;
+             these numbers do. -->
+        <span class="count usage" title="How many of this ladder's maps have a render, out of every render stored — and what those renders weigh against everything the extension keeps: every render, the map catalogue, the guides, any alignment sample. The megabytes counted for the ladder are its full-size renders, which is where the size is; the thumbnails share one storage item and cannot be weighed per map, so the two figures are not meant to add up to each other."></span>
+      </div>
+
+      <main class="maps"></main>
+      <p class="mapsEmpty empty" hidden></p>
+    </template>
+
+    <!-- One panel per tab. The ladder panels are cloned from the template above
+         and inserted at the front of this list by options.js — which ladders
+         exist is src/ladder.js's answer, not the markup's, so the tab strip is
+         built from whatever ends up here. -->
+    <div id="panels">
+    <!-- First of the fixed panels, so it sits straight after the ladders: it is
+         about the same maps, from the store's side rather than a pool's. -->
+    <section class="tabpanel" data-tab="stored" data-label="Stored maps" role="tabpanel" hidden>
+      <div class="listbar">
+        <h2>
+          Stored maps
+          <span class="help" tabindex="0" role="note" aria-label="About the store">?
+            <span class="tip">
+              Everything this machine is holding, whatever ladder it belongs to —
+              a ladder tab lists that pool's maps and nothing else, so a map
+              rendered from a match on anything else appears only here. Heaviest
+              first, because the reason to open this tab is usually that storage
+              is filling up. Deleting a render keeps the card and the guide, and
+              the map can be rendered again; forgetting a map takes the card with
+              it and keeps the guide.
+            </span>
+          </span>
+        </h2>
+        <input id="storedFilter" type="search" placeholder="filter by map name" />
+        <span class="count" id="storedCount"></span>
+        <span class="alignhint" id="storedUsage"></span>
+      </div>
+
+      <div class="alignbar">
+        <button id="storedAll" class="linkbtn" type="button" title="Tick every map in the list, as it is filtered.">Select all</button>
+        <button id="storedNone" class="linkbtn" type="button" title="Untick everything. Nothing is deleted.">Clear selection</button>
+        <button id="storedDropRender" type="button" title="Delete the ticked maps' renders — the megabytes. The cards, the guides and the map list stay, and a deleted render can be made again.">Delete renders</button>
+        <button id="storedForget" type="button" title="Forget the ticked maps: the cards and their renders. The guides are kept, and a card comes back if the map is played or rendered again.">Forget maps</button>
+        <span id="storedStatus" class="alignhint"></span>
+      </div>
+
+      <p id="storedEvicted" class="lede" hidden></p>
+      <div id="storedList" class="storedlist"></div>
+      <p id="storedEmpty" class="empty" hidden></p>
+    </section>
+
+    <!-- The settings for the half of the extension that draws over the game.
+         Everything here is prose rather than a tooltip: this is a page you open
+         to decide something, and a setting whose scope is behind a hover is the
+         reason the ladder tab's preview box was read as having nothing to do
+         with the overlay. The tooltips elsewhere explain a list you came to use;
+         these explain a choice you came to make. -->
+    <section class="tabpanel" data-tab="overlay" data-label="Overlay settings" role="tabpanel" hidden>
+      <div class="settings">
+        <section class="setgroup">
+          <h2>Hotkeys</h2>
+          <!-- A label, not the help symbol it used to be: it is three lines and
+               true of every key below, which is little enough to leave on the
+               page. What each key *does* is a symbol per row — as is the warning
+               about a binding, which belongs to the row whose binding it is
+               about rather than to one tooltip for all four. -->
+          <p class="setlede">
+            Click a key, then press the combination you want. A hotkey can be
+            taken by the game, the browser or Windows — Alt+Shift is the Windows
+            keyboard-layout switch, for instance, and never reaches the page.
+          </p>
+          <div id="keys" class="keys-list"></div>
+        </section>
+
+        <!-- The one part of the extension that writes to the game rather than
+             drawing over it, so the lede says exactly what a press does. The
+             claim is checkable: one press is one queue action, the same one the
+             sidebar sends, and placement is untouched. -->
+        <section class="setgroup">
+          <h2>Build hotkeys</h2>
+          <p class="setlede">
+            A key that queues one of something — the same order clicking its
+            sidebar cameo sends, and nothing else: you still place a building
+            yourself. The game has no build hotkeys of its own, so most of these
+            will be keys it already uses for something; the extension takes the
+            press first, and the debug panel's <em>build keys</em> row lists
+            which of your bindings override a game command.
+          </p>
+          <p class="setlede">
+            Bindings are per side, because the sides do not build the same
+            things. A key bound to a unit your country cannot build stays inert
+            and says so in the match rather than doing something else.
+          </p>
+          <div id="buildSides" class="buildsides"></div>
+          <div id="buildList" class="keys-list"></div>
+          <div class="buildadd">
+            <select id="buildPick" aria-label="Object to bind"></select>
+            <button id="buildAdd" class="keybtn" type="button">Bind a key…</button>
+          </div>
+        </section>
+
+        <section class="setgroup">
+          <h2>Options</h2>
+          <p class="setlede">
+            What the extension draws over the game — the loading-screen panel and
+            the in-game overlay, which are the same picture and the same roster at
+            two moments. What this page shows on its own cards is set on a ladder
+            tab, and neither follows the other.
+          </p>
+
+          <!-- The symbol sits outside the label: inside it, clicking to read
+               the explanation would tick the box it explains. -->
+          <div class="setrow">
+            <label class="opt">
+              <input id="prefOriginal" type="checkbox" />
+              Use the map's own preview
+            </label>
+            <span class="help" tabindex="0" role="note" aria-label="About the in-game preview">?
+              <span class="tip">
+                Unticked, both slots show our render — drawn from the map's cell
+                data with the game's own art — and fall back to the map's baked-in
+                picture where there is no render. Ticked, they show the baked-in
+                picture, which is a couple of pixels per cell. A card set to
+                <em>Original</em> or <em>Ours</em> on a ladder tab outranks this
+                for that one map, and the swap hotkey writes it.
+              </span>
+            </span>
+          </div>
+
+          <div class="setrow">
+            <label class="opt">
+              <input id="prefFullIcons" type="checkbox" />
+              Mark tech buildings on the full render
+            </label>
+            <span class="help" tabindex="0" role="note" aria-label="About the tech-building marks">?
+              <span class="tip">
+                The pictograms on the loading-screen panel and the full render
+                over the game — a droplet for an oil derrick, a parachute for an
+                airport. They are drawn over the picture rather than into it, so
+                this takes effect at once and re-renders nothing.
+              </span>
+            </span>
+          </div>
+
+          <div class="setrow">
+            <label class="opt">
+              <input id="prefAutoRender" type="checkbox" />
+              Render a map the first time it is played
+            </label>
+            <span class="help" tabindex="0" role="note" aria-label="About rendering on first play">?
+              <span class="tip">
+                A map with no render of ours gets one while the match loads,
+                once, and it is kept. Unticked, a render is only made by
+                <em>Render ticked</em> on a ladder tab or a card's own
+                <em>Re-render</em> — and a map with no render has nothing for the
+                preview setting to prefer.
+              </span>
+            </span>
+          </div>
+        </section>
+      </div>
+
+      <!-- Its own row. The chord grid is five cameos wide — 400px of fixed
+           geometry, because the whole point is that it looks like the keys it
+           stands for — and no column of a four-up flex row is that wide. In the
+           row above it overflowed into its neighbour and pushed a scrollbar onto
+           the page. -->
+      <div class="settings">
+        <!-- The grid half of the same feature. There is no key-capture widget
+             here on purpose: the keys are the keyboard's own block and cannot be
+             reassigned, so what a slot holds is the only thing left to choose. -->
+        <section class="setgroup setgroup-wide">
+          <h2>Build chords</h2>
+          <!-- Two columns: the explanation on the left at its own reading width,
+               everything you can actually press on the right. The prose is long
+               because the feature is — seven paragraphs before the first tick box
+               — and read down one column it put the grid, which is the thing being
+               explained, below the fold. The width was there for the taking: this
+               group is the only one in its row. -->
+          <div class="chordsplit">
+            <div class="chordprose">
+              <p class="setlede">
+                The game already has keys for the four sidebar tabs — <em>q w e r</em>
+                unless you have changed them. Press one <strong>twice, quickly</strong>
+                and that tab opens as a grid under the cursor, laid out like the keys
+                themselves: <em>qwert</em> on the top row, <em>asdfg</em> under it,
+                <em>zxcvb</em> below. The next key orders that slot, <em>Shift</em>
+                orders five of a unit, <em>Ctrl</em> puts one next, and <em>Esc</em>
+                or a click outside closes it.
+                Only keys you can order right now are drawn; the rest keep their
+                place in the block but stay blank.
+                A structures chord pressed while a building is finished picks that
+                building up to place instead — its queue is full until you do, and
+                the tab key does the same from an <em>open</em> grid, for the
+                building that finished while you were watching it.
+              </p>
+              <p class="setlede">
+                <strong>How many:</strong> a tap is one, <em>Shift</em> is five, and
+                a key <strong>held down</strong> for about half a second fills the
+                queue with as many as still fit. <strong>Alt</strong> turns any of
+                the three into a cancel aimed at that slot — once to put its queue on
+                hold, again to cancel; <em>Alt+Shift</em> for five, <em>Alt</em> held
+                down for all of them. A tap has already acted before a hold counts,
+                so nothing waits for the key to come back up.
+              </p>
+              <p class="setlede">
+                <strong>Ctrl</strong> orders the slot <strong>next</strong> rather
+                than last — the game's own Ctrl+click on a cameo. It goes in behind
+                whatever is being built, which keeps its progress and its place: five
+                Rhinos with a Ctrl'd Grizzly build one Rhino, then the Grizzly, then
+                the other four. <em>Ctrl+Shift</em> inserts five and <em>Ctrl</em>
+                held fills the queue behind the head. It does nothing on a buildings
+                tab, whose queue holds one item at a time, and the same
+                <strong>Ctrl</strong> on any of the fixed build keys below means the
+                same thing.
+              </p>
+              <p class="setlede">
+                The first press is still the game's own tab switch; nothing is taken
+                from it. If you have rebound the tabs, the chords move with them.
+              </p>
+              <p class="setlede">
+                <strong>Alt</strong> and a tab key stops what that tab is building,
+                without opening anything: once to put the queue on hold, again to
+                cancel it — the sidebar's own right click, on the item being paid
+                for. A finished building cancels on the first press, having nothing
+                left to pause. <strong>Alt+Shift</strong> cancels five at once, and
+                pauses on the way if you had not already. Alt is the cancel
+                everywhere: on a slot of an open grid it is that slot, with no grid
+                open it is the tab's own queue.
+              </p>
+
+              <p class="setlede">
+                A key whose building is a <strong>superweapon</strong> stops ordering
+                once you have one — a second Chronosphere grants no second
+                Chronosphere — and <strong>aims</strong> it instead, entering the
+                same targeting mode the sidebar cameo does, so you still pick the
+                target yourself. Those tiles show the charge where a queue's progress
+                would be, and turn green when it is ready.
+              </p>
+              <p class="setlede">
+                The two <strong>paradrops</strong> keep keys of their own, because
+                the buildings behind them are not superweapon buildings: the American
+                drop shares the Grand Cannon's key — one is French, the other
+                American, so the key is dead for neither — and the drop off a
+                captured tech airport is on <em>g</em>, the same key on both defence
+                grids. That leaves the Airforce Command key building airfields, which
+                is what it is for.
+              </p>
+            </div>
+
+            <div class="chordcontrols">
+              <div class="setrow">
+                <label class="opt">
+                  <input id="prefSidebarKeys" type="checkbox" />
+                  Show the keys on the game's own sidebar
+                </label>
+                <span class="help" tabindex="0" role="note" aria-label="About the keys on the sidebar">?
+                  <span class="tip">
+                    The second letter of the chord, drawn in the corner of each
+                    cameo, and the tab's own key on each of the four tab buttons —
+                    so the sidebar you are already looking at says how to order what
+                    is on it, without opening a grid to find out. Drawn over the
+                    game, never in the way of it: the badges take no clicks. A cameo
+                    the game has greyed out keeps its key, dimmed.
+                  </span>
+                </span>
+              </div>
+
+              <div class="setrow">
+                <label class="opt">
+                  <input id="prefChordSingle" type="checkbox" />
+                  Open the grid on one press instead of two
+                </label>
+                <span class="help" tabindex="0" role="note" aria-label="About opening on one press">?
+                  <span class="tip">
+                    The tab key opens the grid the moment it is pressed, rather than
+                    only when it is pressed twice quickly. The press still reaches
+                    the game and still switches the sidebar tab — nothing else about
+                    the feature changes — but the grid is then in the way of the
+                    next key, which is the point of it and the reason this is a
+                    choice rather than the default.
+                  </span>
+                </span>
+              </div>
+
+              <div class="setrow">
+                <label class="opt">
+                  <input id="prefFullscreenEnter" type="checkbox" />
+                  Fullscreen on Alt+Enter instead of Alt+F
+                </label>
+                <span class="help" tabindex="0" role="note" aria-label="About moving the fullscreen key">?
+                  <span class="tip">
+                    Alt+F is the game's own fullscreen key — its menu says so where
+                    an exit would be, since on a page leaving is closing the tab. But
+                    <em>f</em> is also a key on the build grid, and Alt on a grid key
+                    cancels what that slot is building, so the two want the same
+                    press. Ticked, Alt+Enter does what Alt+F did and Alt+F does
+                    nothing on its own; the grid still takes it while a grid is open,
+                    which is the case this exists for. Unticked, Alt+F is the game's
+                    again everywhere except under an open grid, where it stays a
+                    cancel. Nothing here calls fullscreen itself — the game is handed
+                    its own key, so it keeps the keyboard lock it takes with it.
+                  </span>
+                </span>
+              </div>
+
+              <div class="setrow">
+                <label class="opt">
+                  <input id="prefMenuOffEscape" type="checkbox" />
+                  The game's menu on its own key instead of Escape
+                </label>
+                <span class="help" tabindex="0" role="note" aria-label="About moving the menu off Escape">?
+                  <span class="tip">
+                    Escape is the game's own key for the in-game menu — Options,
+                    Fullscreen, <em>Abort Mission</em>, Resume Mission — so mid-match
+                    it is one reflex and one click from quitting, on the key a hand
+                    reaches for to cancel something. Ticked, Escape does nothing in a
+                    match and the key in the list above opens the menu instead; press
+                    it again, or press Escape, to leave. Escape one screen deep —
+                    the quit confirmation, the options — steps back rather than out.
+                    Unticked, Escape opens the menu exactly as the game shipped it,
+                    and closing it is the Resume Mission button, because the game
+                    binds no key to that at all. Whichever key the game has on
+                    <em>Options</em> is the one swallowed, so rebinding it in the
+                    game's own key settings is respected rather than fought.
+                  </span>
+                </span>
+              </div>
+
+              <div class="setrow">
+                <label class="opt">
+                  <input id="prefGrabTabKeys" type="checkbox" />
+                  Hold the keys Ctrl needs against the browser in fullscreen
+                </label>
+                <span class="help" tabindex="0" role="note" aria-label="About holding Ctrl+W">?
+                  <span class="tip">
+                    Ctrl+W closes the tab and the page is never asked, so
+                    <em>Ctrl</em> cannot mean “queue next” on the grid's
+                    <em>w</em> and <em>t</em> slots without this: it takes those two
+                    keys from the browser while the game is in <em>its own</em>
+                    fullscreen — the client's button, not F11 — exactly as a
+                    fullscreen game does. Escape and F11 are left alone, so the way
+                    out is never something this took. Unticked, Ctrl+W closes the tab
+                    as it always did and those two slots simply have no
+                    “next”.
+                  </span>
+                </span>
+              </div>
+              <div id="chordSides" class="buildsides"></div>
+              <div id="chordTabs" class="chordtabs"></div>
+              <div id="chordGrid" class="chordgrid"></div>
+              <div class="chordedit">
+                <span id="chordSlotName" class="chordslotname">Pick a key above to change what is on it.</span>
+                <select id="chordPick" aria-label="Object for this key" disabled></select>
+                <button id="chordClear" class="keybtn" type="button" disabled>Clear key</button>
+                <button id="chordReset" class="keybtn" type="button">Reset section</button>
+              </div>
+
+              <!-- The pictures the grid above is drawn with, asked of the player's
+                   own client rather than shipped: the sheet in this repo came out of
+                   a retail Red Alert 2 install and nobody here holds the right to
+                   redistribute it. Here rather than on the Replays tab, where it
+                   used to sit: the timeline draws from the same sheet, but this is
+                   the grid the pictures ARE. It needs a game tab, not a match, and
+                   takes about a tenth of a second once the client is up. -->
+              <div class="alignbar">
+                <!-- The label carries the durable fact — a profile that has already
+                     harvested reads "Re-harvest" — so the line beside it is free to be
+                     a status: it says what a run is doing and then goes away. -->
+                <button id="harvestGo" type="button" title="Ask the running client for the sidebar picture of every object it knows, and keep them. Opens a game tab if none is open; no match is needed, and a second run does nothing unless the client has changed.">Harvest cameos</button>
+                <!-- The same setting as the one on the Replays tab, not a second
+                     one: both wear .visiblerun and are kept in step. Shown twice
+                     because it governs both runs that open a tab, and a control
+                     that only exists on the tab you are not on is a control nobody
+                     finds. -->
+                <label class="opt" title="Open the run's tab in front of you rather than behind. A tab the browser genuinely hides has its timers clamped and gets no animation frames at all, and the client's boot leans on both — so a hidden run is brought forward anyway once it looks stuck. This asks for it from the start.">
+                  <input id="harvestShow" class="visiblerun" type="checkbox" />
+                  Always run in a visible tab
+                </label>
+                <!-- Last in the bar, and not .alignhint. Between the button and the
+                     tick box its length moved the tick box every time a run said
+                     something new; at the far right, which is what .alignhint would
+                     give it, it sat a hand's width from the button it is about. -->
+                <span id="harvestStatus" class="runhint"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </section>
+
+    <!-- The one tab that reaches into the game client's own stores. Its hotkey
+         table is a file inside the browser's origin-private file system and its
+         other options are that browser's localStorage: both per-origin AND
+         per-browser, so a second browser starts blank and there is nothing on
+         disk to copy across. -->
+    <section class="tabpanel" data-tab="backup" data-label="Backup" role="tabpanel" hidden>
+      <div class="settings">
+        <section class="setgroup">
+          <h2>
+            Save your settings
+            <span class="help" tabindex="0" role="note" aria-label="About settings backups">?
+              <span class="tip">
+                The game keeps its hotkeys in a file inside the browser's own
+                private storage, and the rest of its options in that browser's
+                localStorage. Neither is a file you can find and copy. This reads
+                both through a game tab — one is opened if none is listening —
+                and writes them into a single file alongside the extension's own
+                bindings.
+              </span>
+            </span>
+          </h2>
+          <p class="setlede">
+            Everything that defines your keyboard, in one file: the game's own
+            hotkeys first, the extension's bindings next to them. Take it to
+            another browser, load it there, and neither half has to be rebound
+            by hand.
+          </p>
+
+          <div class="backupwhat">
+            <label class="opt" title="The client's own [Hotkey] table — keyboard.ini, and keyboardmd.ini as well if you have played Yuri's Revenge. The part of this that nothing else can carry.">
+              <input id="backupHotkeys" type="checkbox" checked />
+              Game hotkeys
+            </label>
+            <label class="opt" title="Scroll rate, the graphics preset, right-click move and scroll, mouse acceleration, sound and music levels, and your preferred host options. Not your nickname, region or login: those are identity rather than settings, and are never carried.">
+              <input id="backupGameOpts" type="checkbox" checked />
+              Other game options
+            </label>
+            <label class="opt" title="The extension's own: the number keys, the build hotkeys per side, the chord grids, and the tick boxes on the Overlay settings tab.">
+              <input id="backupBindings" type="checkbox" checked />
+              Extension bindings
+            </label>
+            <label class="opt" title="Your own writing about maps: the per-map guides, which preview each map shows, and the start-position marks you have turned off.">
+              <input id="backupNotes" type="checkbox" checked />
+              Map guides
+            </label>
+          </div>
+
+          <div class="alignbar">
+            <button id="backupRead" class="keybtn" type="button">Read my settings</button>
+            <button id="backupSave" class="keybtn" type="button" disabled>Save to a file</button>
+            <button id="backupCopy" class="linkbtn" type="button" disabled>Copy</button>
+            <span id="backupStatus" class="alignhint"></span>
+          </div>
+          <div id="backupSummary" class="backupsummary"></div>
+        </section>
+
+        <section class="setgroup">
+          <h2>Load a backup</h2>
+          <p class="setlede">
+            What the file holds is listed before anything is written. What was
+            there before is kept, so <em>Undo</em> puts it back — and an import
+            reloads the game tab where the client reads a setting only at
+            start-up. The same tick boxes govern what is taken out of the file,
+            so a backup holding everything can be loaded for its hotkeys alone.
+          </p>
+          <div class="alignbar">
+            <input id="backupFile" type="file" accept=".json,application/json" aria-label="A backup file" />
+            <button id="backupPasteLoad" class="linkbtn" type="button">Read the box below instead</button>
+          </div>
+          <div id="backupLoaded" class="backupsummary"></div>
+          <div class="alignbar">
+            <button id="backupApply" class="keybtn" type="button" disabled>Apply it</button>
+            <button id="backupUndo" class="linkbtn" type="button" hidden>Undo the last import</button>
+            <span id="backupLoadStatus" class="alignhint"></span>
+          </div>
+        </section>
+
+      </div>
+
+      <section class="backupfile">
+        <h2>The file itself</h2>
+        <p class="setlede">
+          The same JSON, for when a file picker is in the way — a locked-down
+          profile, a machine you are on through someone else's screen.
+          <em>Copy</em> fills it from a read; paste one in and
+          <em>Read the box below instead</em> takes it. The
+          <code>readable</code> block in it is written for you and ignored on the
+          way back in, so editing it changes nothing.
+        </p>
+        <textarea id="backupText" class="backuptext" spellcheck="false" placeholder="A backup, as JSON."></textarea>
+      </section>
+    </section>
+
+    <!-- What the extension did, so a wrong row on another tab has an
+         explanation next to it instead of behind F12. -->
+    <section class="tabpanel" data-tab="log" data-label="Log" role="tabpanel" hidden>
+      <div class="alignbar">
+        <h2>
+          Log
+          <span class="help" tabindex="0" role="note" aria-label="About the log">?
+            <span class="tip">
+              The last few hundred things the extension did, newest at the
+              bottom: the game tab's narration of a render run, and every write
+              to storage — attempted, then stored or failed. It survives the tab
+              that made it, which the debug HUD in game does not.
+            </span>
+          </span>
+        </h2>
+        <label class="opt" title="Show only warnings and errors.">
+          <input id="logWarnOnly" type="checkbox" />
+          Problems only
+        </label>
+        <input id="logFilter" type="search" placeholder="filter" />
+        <span class="count" id="logCount"></span>
+        <button id="logCopy" class="linkbtn" type="button" title="Copy every line shown to the clipboard.">Copy</button>
+        <button id="logClear" class="linkbtn" type="button" title="Empty the log. Nothing else is touched.">Clear</button>
+        <span id="logStatus" class="alignhint"></span>
+      </div>
+      <div id="logList" class="loglist"></div>
+      <p id="logEmpty" class="empty" hidden></p>
+    </section>
+
+    <!-- Replays. Two ways in, because a replay is named by two different things
+         depending on where you came from: a URL you already have (the game page,
+         the client's own replay route, the file) or a player whose recent
+         matches the ladder will list. -->
+    <section class="tabpanel" data-tab="replays" data-label="Replays" role="tabpanel" hidden>
+      <div class="alignbar">
+        <h2>
+          Replays
+          <span class="help" tabindex="0" role="note" aria-label="About replay reports">?
+            <span class="tip">
+              A ladder replay records every action both players took, so the
+              build order is in the file — this page reads it without loading
+              the game. Everything is shown where it happened: a structure is
+              two rows, <em>ordered</em> and <em>placed</em>, and units are shown
+              as the game <em>accepted</em> them into a queue, which holds 30 of
+              a type. Clicks at a full queue are counted apart, under
+              <em>overclicks</em>, because they are not units. Nor is an
+              accepted order a delivery — it can still be cancelled, starved of
+              credits or lost with its factory. What actually came out, when a
+              building was ready to place, credits, kills and losses are not in
+              a replay at all: <em>Run the match</em> plays it through in a game
+              tab (a few seconds) and reads those off the simulation.
+            </span>
+          </span>
+        </h2>
+        <!-- The full sentence is the title, not the placeholder: a box narrow
+             enough to sit in a bar cuts a placeholder off mid-word, and a hint
+             that is only readable in a wide window is not a hint. -->
+        <input
+          id="replayInput"
+          type="search"
+          placeholder="replay link or game id"
+          title="The leaderboard's game page, the client's own #/replay/ route, the .rpl link itself, or a bare game id."
+        />
+        <button id="replayGo" type="button" title="Read the replay and show both build orders.">Open</button>
+        <!-- Its own class, not .alignhint: that one is the status text at the
+             end of a bar and takes the row's slack, which on this bar opened a
+             hand's width of nothing between the two ways in. -->
+        <span class="alignsep">or</span>
+        <input id="replayPlayer" type="search" placeholder="player name" title="A ladder name, as it is spelled on the leaderboard." />
+        <select id="replayRealm" title="Which realm's ladder to ask. A player's history lives in the realm they play."></select>
+        <select id="replayLadder" title="Which ranked ladder to list matches from."></select>
+        <button id="replayHistory" type="button" title="List that player's recent ranked matches.">Match history</button>
+      </div>
+      <!-- The second bar: what is done with a replay once there is one. Apart
+           from the bar above because those two boxes are how a match is found
+           and these controls are what happens to it after — one row of finding,
+           one row of running, rather than eleven controls wrapping as one. -->
+      <div class="alignbar">
+        <!-- The other half of a report: the file says what was done, this plays
+             the match through in a game tab to find out what happened. -->
+        <button id="replaySim" type="button" disabled>Run the match</button>
+        <!-- The way a re-run leaves this machine. The site can parse a replay
+             but can never re-run one, so a report that has been run is the only
+             form in which losses and credits reach a reader without the
+             extension. -->
+        <button id="replayExport" type="button" disabled title="Save this report as a file. It opens on the companion site, re-run and all.">Export</button>
+        <!-- The speed a re-run drives the match at, in game ticks a second, and
+             a debug control on purpose: the rate is what decides whether a long
+             match finishes or takes its tab down, and the boundary is worth
+             finding by hand rather than guessing. Empty means the built-in
+             pace; 0 means flat out. -->
+        <label class="opt" title="Game ticks a second for a re-run. The client's own fastest is 240 (x16), which is four ticks a frame; a run left flat out does about 2700, which is forty-five, and that is what has been killing tabs on long matches. Empty = the built-in pace (240 over 20000 ticks, flat out below). 0 = flat out.">
+          re-run at
+          <input id="replayPace" type="number" min="0" max="5000" step="60" placeholder="240" class="paceinput" />
+          ticks/s
+        </label>
+        <!-- The other debug control, and the one experiment left after pacing
+             was refuted: a run in a tab the browser really shows, against one it
+             only tells the client it is showing. -->
+        <label class="opt" title="Bring the run's tab to the front as soon as it opens, for every match. A long match does this anyway: measured over seven dead tabs, a run in a tab the browser genuinely hides grows 217 MB and is killed near the end of the match, while the same run in a tab it shows finishes with the heap where it started. Short matches have never failed hidden.">
+          <input id="replayShow" class="visiblerun" type="checkbox" />
+          Always run in a visible tab
+        </label>
+        <span id="replayStatus" class="alignhint"></span>
+      </div>
+      <!-- What has already been asked for, so the second time is a click rather
+           than the same thing typed again. Side by side, and each beside the box
+           it belongs to: a replay is re-opened from the left, where it was
+           pasted, and a name is re-asked from the right, above the list that
+           answering it fills. Stacked full-width they were three quarters air —
+           a row of a listed match is four short columns — and every line they
+           took was a line the report started lower by. -->
+      <div id="replayPanes" class="replaypanes" hidden>
+        <section id="replayRecentReplays" class="replaypane" hidden>
+          <div class="replaypanehead"><h3 class="replaypanetitle">opened before</h3></div>
+          <div id="replayRecentList" class="replaylist recent"></div>
+        </section>
+        <section id="replayFound" class="replaypane" hidden>
+          <!-- The names on the pane's own head line, after what the pane holds:
+               a name asked before is a way to fill the list under it, so the two
+               belong on one line — and one head line per pane is what starts
+               both lists at the same height. -->
+          <div class="replaypanehead">
+            <h3 class="replaypanetitle">match history</h3>
+            <div id="replayRecentPlayers" class="replayrecents" hidden>
+              <span class="replayrecentlabel">asked before</span>
+              <span id="replayRecentNames" class="replayrecentnames"></span>
+            </div>
+          </div>
+          <div id="replayList" class="replaylist"></div>
+        </section>
+      </div>
+      <div id="replayReport" class="replayreport"></div>
+      <p id="replayEmpty" class="empty" hidden></p>
+    </section>
+    </div>
+
+    <!-- Filled and shown by options.js when a preview is clicked. -->
+    <div id="lightbox" class="lightbox" hidden>
+      <!-- Image and badges move together: the viewer transforms the stage, so a
+           badge stays on its building through every zoom and pan. -->
+      <div id="lightboxStage" class="lightbox-stage">
+        <img id="lightboxImg" alt="" draggable="false" />
+        <canvas id="lightboxIcons" class="lightbox-icons"></canvas>
+      </div>
+      <span class="lightbox-hint">scroll to zoom · drag to move · double-click to fit · Esc to close</span>
+    </div>
+
+    <!-- Before options.js: it reads __cdcLadder at load time for the ladder and
+         realm lists, but keeping the one thing that talks to a third-party API
+         in its own file is the point. -->
+    <!-- The pictograms, shared with the renderer: this page composites them over
+         a full render that no longer carries them baked in. -->
+    <script src="glyphs.js"></script>
+    <script src="ladder.js"></script>
+    <!-- The replay reader and the object table it names what it decodes with.
+         Two sources, and the order matters: this file is the bootstrap, loaded
+         first so the very first report has names, and options.js installs the
+         table harvested from the player's own client over the top of it as soon
+         as there is one. The harvested table wins because it comes from the
+         client that recorded the replay; this one exists so a profile that has
+         never harvested is not reading `building #12`. -->
+    <script src="replay-types.js"></script>
+    <script src="replay.js"></script>
+    <!-- The chord sections, key block and shipped layouts, shared verbatim with
+         the game tab: this page edits the grid companion.js plays, so the two
+         cannot be allowed to hold separate copies of what a slot means. -->
+    <script src="build-chords.js"></script>
+    <!-- The report renderer, before the page that hands it a report. -->
+    <script src="replay-view.js"></script>
+    <!-- Before options.js, which calls __cdcAlign.mount() and does nothing when
+         it is absent. The panel builds its own markup, because a static
+         <section> inside a shared page cannot be dropped by an allowlist. -->
+    <script src="options.js"></script>
+  </body>
+</html>

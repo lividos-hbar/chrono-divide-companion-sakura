@@ -1,0 +1,977 @@
+/* Companion for Chrono Divide — injected into the client's own loading screen.
+   Every selector is namespaced .cdc-* so nothing here can collide with the
+   client's stylesheet. The client positions its own text in the left column
+   (left: 20px, width: 400px); we take the right half, over the country artwork.
+   Box geometry comes from PANEL in companion.js — change it there, not here. */
+
+.cdc-faction {
+  margin: 0 0.5em 0 0.35em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  /* Inherit the row's inline player colour instead of picking our own. */
+  color: inherit;
+  opacity: 0.95;
+}
+
+.cdc-faction::before {
+  content: "[";
+  opacity: 0.55;
+}
+
+.cdc-faction::after {
+  content: "]";
+  opacity: 0.55;
+}
+
+.cdc-faction[data-side="Allied"]::before,
+.cdc-faction[data-side="Allied"]::after {
+  color: #6fb3ff;
+}
+
+.cdc-faction[data-side="Soviet"]::before,
+.cdc-faction[data-side="Soviet"]::after {
+  color: #ff6b5e;
+}
+
+.cdc-faction[data-side="Yuri"]::before,
+.cdc-faction[data-side="Yuri"]::after {
+  color: #c07dff;
+}
+
+/* --- map preview --------------------------------------------------------- */
+
+.cdc-map {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4em;
+}
+
+.cdc-map-img {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-width: 100%;
+  object-fit: contain;
+  /* The preview is a low-res bitmap upscaled ×2/×4 — keep the pixels crisp
+     instead of letting the browser smear them. */
+  image-rendering: pixelated;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 0, 0.35);
+}
+
+.cdc-map-facts {
+  flex: 0 0 auto;
+  padding: 0.25em 0.6em;
+  background: rgba(0, 0, 0, 0.55);
+  color: #ffff00;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+/* Shown in the preview's place when there is nothing to preview — a silent
+   absence is indistinguishable from a broken build, which cost a round once. */
+.cdc-map-error {
+  position: absolute;
+  padding: 0.5em 0.8em;
+  background: rgba(60, 0, 0, 0.75);
+  border: 1px solid rgba(255, 80, 60, 0.6);
+  color: #ffb0a5;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+/* --- in-game overlay (its key is rebindable) ------------------------------------------------ */
+
+/* The client renders the HUD in WebGL, so this layer floats above the canvas.
+   Nothing here takes pointer events except the preview box, which is draggable
+   — a stray click must reach the game, not this overlay. */
+.cdc-ig {
+  position: absolute;
+  inset: 0;
+  z-index: 100000;
+  pointer-events: none;
+  font: 12px/1.4 "Fira Sans Condensed", "Segoe UI", sans-serif;
+}
+
+/* Two rows for everything: the roster stacked on the left, map facts over the
+   hint on the right. With more than two players the roster grows sideways into
+   more columns rather than downwards into more rows. */
+.cdc-ig-top {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 84%;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid rgba(255, 224, 0, 0.4);
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  text-align: left;
+  overflow: hidden;
+}
+
+.cdc-ig-players {
+  display: grid;
+  grid-template-rows: repeat(2, auto);
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  column-gap: 16px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cdc-ig-side {
+  min-width: 0;
+  border-left: 1px solid rgba(255, 224, 0, 0.25);
+  padding-left: 16px;
+}
+
+.cdc-ig-who {
+  display: inline-block;
+  min-width: 30px;
+  margin-right: 5px;
+  color: #b9b6a8;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.cdc-ig-who[data-role="you"] {
+  color: #9de89d;
+}
+
+.cdc-ig-who[data-role="opp"] {
+  color: #ff8f82;
+}
+
+.cdc-ig-player b {
+  font-weight: 700;
+  opacity: 0.95;
+}
+
+.cdc-ig-player b::before {
+  content: "· ";
+  opacity: 0.6;
+}
+
+.cdc-ig-player b[data-side="Allied"] {
+  color: #8fc8ff;
+}
+
+.cdc-ig-player b[data-side="Soviet"] {
+  color: #ff8f82;
+}
+
+.cdc-ig-player b[data-side="Yuri"] {
+  color: #cf9dff;
+}
+
+.cdc-ig-dim {
+  color: #999;
+  font-weight: 400;
+}
+
+.cdc-ig-meta {
+  color: #ffe000;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+}
+
+.cdc-ig-hint {
+  color: #ddd;
+  font-size: 12px;
+  /* One line, so the whole bar stays two rows tall however long a hint is. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A guide sits in that same slot, so it may wrap — but only far enough to stay
+   a bar, and it scrolls past that instead of taking over the screen. */
+.cdc-ig-hint-guide {
+  max-height: 8.4em;
+  overflow-y: auto;
+  text-overflow: clip;
+  white-space: pre-wrap;
+  /* Scrolling needs the wheel, so this one strip stops being click-through.
+     Only this strip: the rest of the overlay stays transparent to the game. */
+  pointer-events: auto;
+}
+
+.cdc-ig-map {
+  position: absolute;
+  pointer-events: auto;
+  cursor: move;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255, 224, 0, 0.5);
+  box-sizing: border-box;
+}
+
+.cdc-ig-map-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  display: block;
+}
+
+.cdc-ig-map-empty {
+  padding: 10px;
+  color: #ff9a8c;
+  font-size: 11px;
+  text-align: center;
+}
+
+.cdc-ig-grip {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+  background: linear-gradient(
+    135deg,
+    transparent 0 45%,
+    rgba(255, 224, 0, 0.8) 45% 55%,
+    transparent 55%
+  );
+}
+
+/* --- hints --------------------------------------------------------------- */
+
+.cdc-hints {
+  position: absolute;
+  bottom: 4%;
+  padding: 0.6em 1em;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 0, 0.35);
+  color: #ffff00;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+  pointer-events: none;
+}
+
+.cdc-hints-title {
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin-bottom: 0.25em;
+}
+
+.cdc-hints-body {
+  color: #fff;
+}
+
+/* A map guide is prose, not a one-liner — but it stays in the hint panel's own
+   place and size, and scrolls rather than growing into the preview above it. */
+.cdc-hints-guide {
+  display: flex;
+  flex-direction: column;
+  max-height: 34%;
+  text-align: left;
+}
+
+.cdc-hints-guide .cdc-hints-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* The whole render over the running game. Sized in the viewport rather than to
+   the image, so a wide map and a tall one both land in the same place, and left
+   translucent on purpose: the match is still going on underneath. */
+.cdc-hq-full {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  cursor: zoom-out;
+}
+
+.cdc-hq-full img {
+  max-width: var(--cdc-hq-size, 90%);
+  max-height: var(--cdc-hq-size, 90%);
+  opacity: var(--cdc-hq-opacity, 0.8);
+  image-rendering: auto;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+}
+
+/* Our own render in a preview slot. Both slots keep `pixelated` for the
+   client's bitmap, which is upscaled ×2/×4 and only survives nearest neighbour;
+   ours is the opposite case — a 3000px map scaled *down* into the box, which
+   nearest neighbour aliases into noise. Last in the file on purpose: it has to
+   outrank both .cdc-map-img and .cdc-ig-map-img, and it matches their
+   specificity. */
+.cdc-smooth {
+  image-rendering: auto;
+}
+
+/* The full render's tech-building badges, painted over the picture instead of
+   into it (RENDERER_VERSION 7) so they can be switched off without re-rendering
+   a 3000px map. Positioned on the *picture*, not the element: the loading-screen
+   slot is object-fit:contain, so the two are not the same box. */
+.cdc-icon-layer {
+  position: absolute;
+  pointer-events: none;
+}
+
+/* The overlay is a sibling of the translucent render, so it has to fade with it
+   — a full-strength glyph over a 80% map reads as a sticker. */
+.cdc-hq-full .cdc-icon-layer {
+  opacity: var(--cdc-hq-opacity, 0.8);
+}
+
+/* A build hotkey that did nothing, said out loud. Bottom centre rather than
+   beside the sidebar: the sidebar is the one part of the screen a player
+   building something is already looking at, and a box that appears there covers
+   the cameos the message is about. `pointer-events: none` because it must never
+   eat a click during a match, and a transition rather than a removal so a
+   second press re-arms the same element instead of thrashing the DOM. */
+.cdc-build-note {
+  position: fixed;
+  left: 50%;
+  bottom: 8%;
+  transform: translateX(-50%);
+  z-index: 100001;
+  padding: 5px 12px;
+  background: rgba(0, 0, 0, 0.78);
+  border: 1px solid rgba(255, 224, 0, 0.45);
+  color: #ffe0a0;
+  font: 13px/1.3 "Fira Sans Condensed", "Segoe UI", sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease-out;
+}
+
+.cdc-build-note.visible {
+  opacity: 1;
+}
+
+/* --- Build chords ---------------------------------------------------------
+
+   The grid a chord opens, and the production panel. Both sit over a running
+   match, so both take pointer events (unlike .cdc-ig, which is a HUD) and both
+   are drawn in the sidebar's own idiom: black, a thin gold rule, condensed
+   type. */
+
+/* One cameo, out of the client's own art. companion.js sets the picture itself
+   as this element's background-image and the three custom properties beside it:
+   --cdc-cameo-w/h size it and --cx/--cy offset into it, which for a one-cell
+   image is the whole picture at zero. They stay properties rather than the two
+   fixed numbers, because the queue panel scales its half-size copy off them.
+   Same arithmetic as .replaycameo in replay-view.css, which still addresses a
+   real sheet — and a different element: that one is an icon in a line of text,
+   this is a key-sized tile. */
+.cdc-cameo {
+  display: block;
+  width: 60px;
+  height: 36px;
+  background-size: var(--cdc-cameo-w) var(--cdc-cameo-h);
+  background-position: calc(-1 * var(--cx)) calc(-1 * var(--cy));
+  background-repeat: no-repeat;
+  /* Pixel art at an integer scale: never resampled, never blurred. */
+  image-rendering: pixelated;
+}
+
+/* An object with no picture in the game's own art says its id rather than
+   drawing an invented placeholder. */
+.cdc-cameo-none {
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  color: #b9a97a;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+
+/* The layer both build overlays live in: inside the client's own root, with the
+   boxes inside it turning pointer events back on. The same arrangement as
+   .cdc-ig / .cdc-ig-map above, which is the one thing in this extension known to
+   take a drag over a running match — 0.54.0 put these two on document.body
+   instead and they stopped taking the mouse at all. */
+.cdc-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 100001;
+  pointer-events: none;
+}
+
+/* The key that orders a cameo, drawn on the cameo. Top-left because that is
+   the one corner the client leaves alone — it puts the queued quantity at the
+   right edge and READY/HOLD across the middle — and because the chord grid's
+   own key badge (.cdc-chord-key) has always sat there, so the two ways of
+   reading the same layout look like each other.
+
+   fixed, and never pointer-events: auto. This is the one overlay in the
+   extension that sits on top of something you have to be able to click. */
+.cdc-key-badge {
+  position: fixed;
+  z-index: 2;
+  pointer-events: none;
+  padding: 0 2px;
+  color: #ffe97a;
+  font-family: "Fira Sans Condensed", "Segoe UI", sans-serif;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  user-select: none;
+  /* No plate behind the letter (0.72.0). A black box with a yellow edge is a
+     piece of our furniture sitting on the game's, and it read as exactly that.
+     What the plate was actually for is legibility over pixel art that is dark
+     in one cameo and bright in the next, so that job moves to the glyph: a
+     1px black outline in eight directions, which is how the game's own sidebar
+     text is drawn and costs no rectangle. 1px rather than a scaled value
+     because the art is pixel art -- a fractional outline at a small size is a
+     smear, and the badge is never large. */
+  text-shadow:
+    1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000,
+    1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+}
+
+/* The tab's own key. Centred on the button rather than cornered on it: a tab is
+   small and has nothing else written on it, so there is no corner to keep out
+   of and the middle reads fastest. */
+/* The tab's own key, in the same corner as a cameo's and tighter than one: the
+   button is small and its artwork is the whole of it, so the badge trades its
+   border and half its padding for the picture underneath. */
+.cdc-key-tab {
+  padding: 0 1px;
+}
+
+/* The client's own grey-out for a cameo it will not accept a click on yet. Same
+   fade as its lightMult of 0.5, so the badge dims with the picture under it. */
+.cdc-key-off {
+  opacity: 0.45;
+}
+
+.cdc-chord {
+  /* fixed, not absolute: placed in viewport coordinates, which is the space
+     the pointer arrives in. The layer around it is for hit-testing only. */
+  position: fixed;
+  pointer-events: auto;
+  z-index: 2;
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.88);
+  border: 1px solid rgba(255, 224, 0, 0.5);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+  font: 12px/1.3 "Fira Sans Condensed", "Segoe UI", sans-serif;
+  color: #ffe0a0;
+  user-select: none;
+}
+
+.cdc-chord-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 0 2px 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+}
+
+.cdc-chord-hint {
+  color: rgba(255, 224, 160, 0.5);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.cdc-chord-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 60px);
+  gap: 4px;
+}
+
+/* Each tile is exactly one cameo wide, so the five columns line up with the five
+   keys they stand for. The name sits under the picture and is allowed to be
+   clipped: the picture is the label, the words are the confirmation. */
+.cdc-chord-slot {
+  position: relative;
+  display: block;
+  width: 60px;
+  padding: 0 0 2px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 224, 0, 0.22);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* `.hovered` is the same state put on by hand. `:hover` never fires while the
+   game holds the mouse — the browser believes the cursor is wherever it froze —
+   so without this a grid would give no sign of which tile it is about to
+   order. */
+.cdc-chord-slot:hover,
+.cdc-chord-slot.hovered {
+  border-color: rgba(255, 224, 0, 0.85);
+  background: rgba(255, 224, 0, 0.12);
+}
+
+.cdc-chord-key {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 13px;
+  padding: 0 3px;
+  background: rgba(0, 0, 0, 0.8);
+  border-right: 1px solid rgba(255, 224, 0, 0.35);
+  border-bottom: 1px solid rgba(255, 224, 0, 0.35);
+  color: #ffe97a;
+  font-size: 10px;
+  font-style: normal;
+  line-height: 14px;
+  text-align: center;
+}
+
+.cdc-chord-name {
+  display: block;
+  padding: 2px 3px 0;
+  font-size: 10px;
+  line-height: 1.15;
+  color: rgba(255, 224, 160, 0.82);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* What the queue says about this tile, drawn over the picture: how many are
+   ordered (top right, mirroring the key badge top left) and how far the one
+   being paid for has got (a rule on the picture's bottom edge, with the number
+   just above it). All three are painted on the client's own onQueueUpdate,
+   which fires on every tick that spends credits. */
+.cdc-chord-qty {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 0 3px;
+  background: rgba(0, 0, 0, 0.82);
+  border-left: 1px solid rgba(255, 224, 0, 0.35);
+  border-bottom: 1px solid rgba(255, 224, 0, 0.35);
+  color: #fff2b0;
+  font-size: 10px;
+  font-style: normal;
+  line-height: 14px;
+}
+
+.cdc-chord-pct {
+  position: absolute;
+  top: 19px;
+  right: 0;
+  padding: 0 3px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #ffe97a;
+  font-size: 9px;
+  font-style: normal;
+  line-height: 12px;
+}
+
+/* On the cameo's own bottom edge — the picture is 36px tall — so the bar reads
+   as belonging to it rather than to the name underneath. */
+.cdc-chord-bar {
+  position: absolute;
+  top: 33px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.cdc-chord-bar::before {
+  content: "";
+  display: block;
+  height: 100%;
+  width: var(--p, 0%);
+  background: #ffe97a;
+}
+
+/* Paused, and finished. Colour carries it because the tile is 60px wide and
+   has no room for a word — the number beside the bar says which it is. */
+.cdc-chord-hold .cdc-chord-bar::before,
+.cdc-chord-hold .cdc-chord-pct {
+  background: #e0a03a;
+}
+
+.cdc-chord-hold .cdc-chord-pct {
+  color: #201400;
+}
+
+.cdc-chord-ready .cdc-chord-bar::before {
+  background: #9ade6a;
+}
+
+.cdc-chord-ready .cdc-chord-pct {
+  background: #9ade6a;
+  color: #0d1a06;
+}
+
+/* Bound, and this key is right — but the thing is not orderable at this moment:
+   prerequisites not up, tech level not reached, a factory that is gone, a build
+   limit already standing, a superweapon still charging. Since 0.71.0 this is the
+   ordinary state of most of a grid rather than the rare stranded-queue case it
+   was, so it has to stay readable.
+
+   Which is why the dim falls on the picture and the name and not on the tile.
+   The key badge is the whole reason a dimmed tile is worth drawing at all, and
+   on a charging superweapon the countdown beside the bar is the one thing being
+   read — both were unreadable at the old whole-tile 0.32. Repainted on the
+   client's own onQueueUpdate, so a tile dims the moment the last Ore Purifier
+   lands rather than at the next opening. */
+.cdc-chord-off {
+  border-color: rgba(255, 224, 0, 0.11);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.cdc-chord-off .cdc-cameo {
+  opacity: 0.3;
+  filter: grayscale(0.85);
+}
+
+.cdc-chord-off .cdc-chord-name {
+  opacity: 0.45;
+}
+
+.cdc-chord-off .cdc-chord-key {
+  opacity: 0.6;
+}
+
+/* No room for another one: the queue is at its size, or this object is at its
+   per-type cap. A different fact from .cdc-chord-off — that one means never,
+   this one means not until something leaves — and the tile stays live, because
+   a full queue is exactly where a cancel is wanted. */
+.cdc-chord-full {
+  filter: grayscale(0.85);
+  opacity: 0.55;
+}
+
+/* A key that no longer orders anything: it aims a superweapon. Blue rather than
+   the grid's yellow because it is a different *kind* of key, not a state of the
+   usual one — the bar under it is a charge, not a build, and pressing it hands
+   the mouse to the client's targeting mode instead of pushing a queue order. */
+.cdc-chord-super {
+  border-color: rgba(120, 210, 255, 0.7);
+  background: rgba(120, 210, 255, 0.1);
+}
+
+.cdc-chord-super .cdc-chord-key {
+  border-color: rgba(120, 210, 255, 0.55);
+  color: #bfe9ff;
+}
+
+/* A weapon that is not charged yet keeps the blue — it is still the other *kind*
+   of key — at the strength the dimmed yellow tiles are drawn at. Two classes,
+   because .cdc-chord-super sets the same two properties and is written after
+   .cdc-chord-off; and **above the hover rule**, which has the same specificity
+   and would otherwise lose to this one on order, leaving a dimmed weapon the one
+   tile on the grid that gives no sign it is about to be pressed. */
+.cdc-chord-super.cdc-chord-off {
+  border-color: rgba(120, 210, 255, 0.26);
+  background: rgba(120, 210, 255, 0.04);
+}
+
+.cdc-chord-super:hover,
+.cdc-chord-super.hovered {
+  border-color: rgba(160, 230, 255, 0.95);
+  background: rgba(120, 210, 255, 0.2);
+}
+
+/* The charge bar, while it is charging. Ready and no-power keep the green and
+   the amber the queue marks already use, so one glance reads the same on both
+   kinds of tile — hence the :not()s rather than relying on which rule is
+   written last, since these blocks sit below those two. */
+.cdc-chord-super:not(.cdc-chord-ready):not(.cdc-chord-hold) .cdc-chord-bar::before {
+  background: #7fd4ff;
+}
+
+/* A key with nothing on it *this match*: empty in the layout, bound to objects
+   none of which this country builds, or a paradrop nobody has the building for.
+   Never a prerequisite that is merely not up — since 0.71.0 that draws a dimmed
+   tile. Drawn as nothing at all, but it still costs its cell, because the grid's
+   geometry is the keyboard's and a hole that closed up would move every key
+   after it. A wholly blank *trailing* row is dropped instead, in chordGridRows,
+   where dropping it moves nothing. */
+.cdc-chord-gap {
+  display: block;
+  height: 52px;
+}
+
+/* Every key of a tab empty — the layout binds nothing this country builds.
+   Since 0.71.0 that is the only way to get here: a tab whose roster is all
+   behind a battle lab draws fifteen dimmed tiles instead. */
+.cdc-chord-none {
+  padding: 6px 3px 2px;
+  color: rgba(255, 224, 160, 0.55);
+  font-size: 11px;
+}
+
+/* The cursor, over our own boxes and nowhere else.
+
+   The client draws its cursor into the canvas and the browser draws none at all
+   while the pointer is locked, so a box of ours covers the only cursor there is.
+   This is the one drawn back over it: fixed, in viewport coordinates like the
+   boxes themselves, its tip at the point, and transparent to the mouse so it
+   never becomes what elementFromPoint answers. The two drop shadows are an
+   outline — one alone leaves the arrow invisible against a bright cameo. */
+.cdc-cursor {
+  position: fixed;
+  z-index: 6;
+  width: 12px;
+  height: 18px;
+  pointer-events: none;
+  background: #ffe97a;
+  clip-path: polygon(0 0, 0 15px, 4px 11px, 7px 18px, 10px 16px, 7px 10px, 11px 10px);
+  filter: drop-shadow(0 1px 0 #000) drop-shadow(0 -1px 0 #000)
+    drop-shadow(1px 0 0 #000) drop-shadow(-1px 0 0 #000);
+}
+
+/* --- The production panel ------------------------------------------------- */
+
+.cdc-queues {
+  position: fixed;
+  pointer-events: auto;
+  z-index: 1;
+  min-width: 232px;
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(255, 224, 0, 0.4);
+  font: 12px/1.35 "Fira Sans Condensed", "Segoe UI", sans-serif;
+  color: #ffe0a0;
+  user-select: none;
+  cursor: move;
+}
+
+.cdc-queues-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 3px 7px;
+  background: rgba(255, 224, 0, 0.1);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+}
+
+.cdc-queues-hint {
+  color: rgba(255, 224, 160, 0.5);
+}
+
+.cdc-queues-body {
+  padding: 3px 0;
+}
+
+/* One row per queue, always all six — a queue with nothing in it is the fact the
+   sidebar cannot show, so it keeps its row and says so. */
+.cdc-queues-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 66px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 7px;
+  min-height: 22px;
+}
+
+.cdc-queues-label {
+  font-size: 11px;
+  color: rgba(255, 224, 160, 0.62);
+}
+
+.cdc-queues-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.cdc-queues-item {
+  position: relative;
+  display: block;
+}
+
+/* Half scale: at 60×36 a row of five would be wider than the panel, and the
+   halves of the source's own size are the only scales that keep the pixel art
+   unresampled. */
+.cdc-queues-item .cdc-cameo {
+  width: 30px;
+  height: 18px;
+  background-size: calc(var(--cdc-cameo-w) / 2) calc(var(--cdc-cameo-h) / 2);
+  background-position: calc(-0.5 * var(--cx)) calc(-0.5 * var(--cy));
+}
+
+.cdc-queues-qty {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 0 2px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #ffe97a;
+  font-size: 9px;
+  font-style: normal;
+  line-height: 11px;
+}
+
+.cdc-queues-empty {
+  color: rgba(255, 224, 160, 0.34);
+  font-size: 11px;
+}
+
+.cdc-queues-state {
+  font-size: 10px;
+  color: rgba(255, 224, 160, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+
+.cdc-queues-ready {
+  color: #8fe07a;
+}
+
+.cdc-queues-hold {
+  color: #ffb060;
+}
+
+/* The first item's progress, drawn as the row's own underline rather than a
+   separate widget — there is one bar per queue and it belongs to the row. */
+.cdc-queues-bar {
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  bottom: 0;
+  height: 1px;
+  background: rgba(255, 224, 0, 0.12);
+}
+
+.cdc-queues-bar::before {
+  content: "";
+  display: block;
+  width: var(--p);
+  height: 100%;
+  background: rgba(255, 224, 0, 0.75);
+}
+
+.cdc-queues-none {
+  padding: 4px 7px;
+  color: rgba(255, 224, 160, 0.45);
+  font-size: 11px;
+}
+
+/* The net readout — the production panel's shape, since it is the same kind of
+   thing: a small floating panel of live numbers, dragged where you want it. */
+.cdc-net {
+  position: fixed;
+  pointer-events: auto;
+  z-index: 1;
+  min-width: 190px;
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(255, 224, 0, 0.4);
+  font: 12px/1.35 "Fira Sans Condensed", "Segoe UI", sans-serif;
+  color: #ffe0a0;
+  user-select: none;
+  cursor: move;
+}
+
+.cdc-net-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 3px 7px;
+  background: rgba(255, 224, 0, 0.1);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+}
+
+.cdc-net-hint {
+  color: rgba(255, 224, 160, 0.5);
+}
+
+.cdc-net-body {
+  padding: 3px 7px 5px;
+}
+
+.cdc-net-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.cdc-net-label {
+  min-width: 46px;
+  color: rgba(255, 224, 160, 0.6);
+}
+
+.cdc-net-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* The client's own three bands (gui/component/PingIndicator), in its own
+   colours: green under 100ms, yellow under 250, red past it. */
+.cdc-net-good {
+  color: #7bd97b;
+}
+
+.cdc-net-avg {
+  color: #ffe000;
+}
+
+.cdc-net-bad {
+  color: #ff6b5a;
+}
+
+.cdc-net-note {
+  color: rgba(255, 224, 160, 0.45);
+  font-size: 11px;
+}
+
+.cdc-net-none {
+  color: rgba(255, 224, 160, 0.5);
+}
+
+.cdc-net-lag {
+  margin-top: 3px;
+  color: #ff6b5a;
+  font-weight: 600;
+}
+
+.cdc-net-players {
+  margin-top: 4px;
+  padding-top: 3px;
+  border-top: 1px solid rgba(255, 224, 0, 0.2);
+}
+
+.cdc-net-players-head {
+  color: rgba(255, 224, 160, 0.45);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.cdc-net-player {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.cdc-net-who {
+  min-width: 84px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

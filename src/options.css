@@ -1,0 +1,1416 @@
+:root {
+  color-scheme: dark;
+  --bg: #12120f;
+  --panel: #1c1c18;
+  --line: #34342c;
+  --ink: #e8e6dd;
+  --dim: #9a978a;
+  --accent: #ffe000;
+  /* Three verdicts, one set of colours: settled, needs work, wrong. Muted
+     rather than signal-bright — a list where a third of the rows are amber
+     should still read as a list. */
+  --ok: #9de89d;
+  --warn: #e8c56a;
+  --bad: #ffb0a5;
+  /* Not a fourth verdict: a date that disagrees with the sample it sits in is
+     evidence, not a fault, and it needs to be findable in a list whose marks
+     are already amber. Red-orange reads as neither of the two it sits between. */
+  --stale: #ef9160;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  /* One container width for the header and the list, so their edges line up. */
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 18px clamp(16px, 3vw, 40px) 56px;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.5 "Segoe UI", system-ui, sans-serif;
+}
+
+/* --- header: tabs on one line with the title ----------------------------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding-bottom: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+/* The tabs sit on the header's own rule rather than above it, so the active one
+   reads as the sheet in front — the rule is the thing it interrupts.
+
+   At the left margin, ahead of the title: they are the page's navigation and
+   everything below them is read left-to-right from that edge, so a strip that
+   started in the middle of the line made the eye hunt for where a panel begins.
+   `order` rather than a markup swap — the heading stays the document's first
+   element, which is what a screen reader and the tab key follow. */
+.tabs {
+  display: flex;
+  align-items: flex-end;
+  order: -1;
+  gap: 2px;
+  margin-bottom: -1px;
+}
+
+.tab {
+  padding: 8px 16px 7px;
+  background: none;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 3px 3px 0 0;
+  color: var(--dim);
+  font: inherit;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tab.active {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--accent);
+  /* Over the header's rule: the active tab and its panel are one surface. */
+  box-shadow: 0 1px 0 0 var(--panel);
+}
+
+.tabpanel[hidden] {
+  display: none;
+}
+
+/* Pushed to the far end: the tabs are what the page is used through, the name
+   is what it is called. The bottom padding is the title's alone — the tabs meet
+   the rule, so it cannot sit on the bar. */
+h1 {
+  margin: 0;
+  margin-left: auto;
+  padding-bottom: 12px;
+  font-size: 19px;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* --- the settings tab ----------------------------------------------------- */
+
+/* Side by side while the window is wide enough for it: both sections are short
+   — four bindings and three tick-boxes — and stacked they put the second one
+   under a fold for no reason. Each column is capped so a line of the lede stays
+   readable rather than running the full half of a 1400px page. */
+.settings {
+  display: flex;
+  align-items: flex-start;
+  gap: 44px;
+  margin-top: 18px;
+}
+
+.setgroup {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 62ch;
+}
+
+.setgroup + .setgroup {
+  padding-left: 44px;
+  border-left: 1px solid var(--line);
+}
+
+/* Narrow: one under the other, and the divider turns with them — a border on
+   the left of a full-width block is a stripe down the page. */
+@media (max-width: 1080px) {
+  .settings {
+    display: block;
+  }
+
+  .setgroup {
+    max-width: 62ch;
+  }
+
+  .setgroup + .setgroup {
+    margin-top: 34px;
+    padding-top: 26px;
+    padding-left: 0;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}
+
+/* The section's own lead-in. Not `.lede`: that one is right-aligned and sized
+   to share a flex row with the pool controls, which is a different job. */
+.setlede {
+  margin: 8px 0 0;
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* The tick-box, its name, and the symbol that explains it — one line each, so
+   three settings read as three settings rather than three paragraphs. */
+.setrow {
+  display: flex;
+  align-items: center;
+  margin-top: 16px;
+}
+
+/* The label is the setting, so it reads at the page's own weight rather than
+   the small dim type `.opt` wears in a controls bar. */
+.setrow .opt {
+  color: var(--ink);
+  font-size: 14px;
+  white-space: normal;
+}
+
+/* The words a tooltip is quoting from the page — a button's name, a card's
+   setting — at the tooltip's own weight rather than italic. */
+.tip em {
+  font-style: normal;
+  color: var(--accent);
+}
+
+/* --- help symbol and its tooltip ----------------------------------------- */
+
+/* A hint that is read once and then in the way for good. Not `title=`: that
+   waits about a second, wraps where the platform feels like it, and cannot be
+   styled — for three sentences it is unreadable. */
+.help {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  /* Never squeezed. Every row this sits in is a flex row — .keyrow,
+     .setrow, .alignbar — and a flex item with a definite width shrinks in
+     width alone, so a tight row drew this circle as an ellipse. */
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  margin-left: 6px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--dim);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1;
+  vertical-align: middle;
+  cursor: help;
+  user-select: none;
+}
+
+.help:hover,
+.help:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+  outline: none;
+}
+
+/* A key whose binding the page can see a problem with. Folding the warning into
+   the tooltip is only safe if the symbol says it has one — otherwise it is
+   hidden rather than tidied away. */
+.help.warn {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+.tip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: -8px;
+  z-index: 20;
+  width: max-content;
+  max-width: 46ch;
+  padding: 8px 10px;
+  background: #232319;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: normal;
+  line-height: 1.45;
+  text-align: left;
+  text-transform: none;
+  /* `visibility`, not display: it keeps the fade, and a hidden tooltip cannot
+     be hovered into staying open. */
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.12s;
+  pointer-events: none;
+}
+
+.help:hover .tip,
+.help:focus-visible .tip {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Every tooltip on the page hangs to the right of its symbol, and none is ever
+   near the right edge: the container is 1400px at its widest and each symbol
+   sits at the far left of its own bar. */
+
+/* One row per key rather than the single strip of all four this was: the rows
+   have to stack for the column layout above, and a row is where a key's own
+   symbol can sit. */
+.keys-list {
+  margin-top: 14px;
+}
+
+.keyrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.keyrow + .keyrow {
+  margin-top: 10px;
+}
+
+.keylabel {
+  /* Fixed, so the four buttons line up under each other — ragged, they read as
+     four unrelated controls rather than one table of bindings. */
+  min-width: 200px;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.keybtn {
+  min-width: 108px;
+  font-family: "Consolas", monospace;
+}
+
+.keybtn.listening {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* The warning, inside the key's own tooltip and under a rule: it is about the
+   binding as it stands, not about what the key does, and reading the two as one
+   paragraph would blur them. */
+.tipwarn {
+  display: block;
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid var(--line);
+  color: var(--bad);
+}
+
+.keyreset {
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+/* --- build hotkeys ------------------------------------------------------- */
+
+/* The side tabs. Buttons rather than radios: they switch a view, they do not
+   record a preference, and a radio group here would be saved by every form the
+   page ever grows. */
+.buildsides {
+  display: flex;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.buildside.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* The label carries a picture as well as a name, so it is the one row-part that
+   cannot be plain text. Same width as `.keylabel` above it, because the two
+   lists are one panel and their key buttons have to line up. */
+.buildlabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.buildadd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+/* Wide enough for the longest name plus its cost without the select truncating
+   mid-word, and capped so a long list does not push the button off a narrow
+   window. */
+.buildadd select {
+  min-width: 200px;
+  max-width: 320px;
+}
+
+/* --- list bar ------------------------------------------------------------ */
+
+/* Pinned to the top of the viewport: the filter, the counts and the storage
+   readout are about the list you are scrolling through, and they were only ever
+   reachable from its first screen. The background is the page's own, because
+   cards scroll underneath it. */
+.listbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 16px 0 14px;
+  padding: 10px 0 9px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+
+h2 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: 0.02em;
+}
+
+.filter {
+  width: 260px;
+  padding: 6px 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--ink);
+  font: inherit;
+}
+
+.filter:focus {
+  outline: 1px solid var(--accent);
+}
+
+.count {
+  color: var(--dim);
+  font-size: 13px;
+}
+
+.lede {
+  flex: 1 1 320px;
+  margin: 0;
+  color: var(--dim);
+  font-size: 13px;
+  text-align: right;
+}
+
+/* --- map cards ----------------------------------------------------------- */
+
+main {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.card {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+/* The card's own column must be allowed to shrink, or a long unbroken line in
+   the textarea would blow the grid track out instead of wrapping. */
+.card > div {
+  min-width: 0;
+}
+
+.card img,
+.card .noshot {
+  width: 220px;
+  height: 170px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  background: #000;
+  border: 1px solid var(--line);
+}
+
+.noshot {
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  color: var(--dim);
+  font-size: 12px;
+  text-align: center;
+}
+
+.card h2 {
+  margin: 0 0 2px;
+  font-size: 15px;
+}
+
+.facts {
+  margin: 0 0 8px;
+  color: var(--dim);
+  font-size: 12px;
+}
+
+textarea {
+  width: 100%;
+  /* A real height, not a min-height: min-height doubles as a floor, which is
+     what stopped the resize handle from making the box any smaller. Drag it to
+     whatever size the guide needs — both axes, up and down. */
+  height: 132px;
+  min-height: 44px;
+  padding: 8px;
+  background: #141410;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--ink);
+  font: 13px/1.45 "Consolas", monospace;
+  resize: both;
+}
+
+textarea:focus {
+  outline: 1px solid var(--accent);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+button {
+  padding: 5px 12px;
+  background: #2b2b23;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+/* The picture column: the preview, and the control that decides which picture
+   it is. */
+.shotcol {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Three states, one of which is "whatever the checkbox in the bar says" — so a
+   segmented control rather than a checkbox: *default* has to be visible as a
+   choice of its own, not inferred from an unticked box. */
+.seg {
+  display: flex;
+}
+
+.segbtn {
+  flex: 1 1 0;
+  padding: 3px 0;
+  color: var(--dim);
+  font-size: 11px;
+  border-radius: 0;
+}
+
+/* Overlapped rather than de-bordered, so the selected button's outline is one
+   line whichever of the three it is. */
+.segbtn + .segbtn {
+  margin-left: -1px;
+}
+
+.segbtn:first-child {
+  border-radius: 3px 0 0 3px;
+}
+
+.segbtn:last-child {
+  border-radius: 0 3px 3px 0;
+}
+
+.segbtn.selected {
+  position: relative;
+  z-index: 1;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Nothing to show: the button is dead rather than offering a picture that does
+   not exist. It can still read as selected — that is the answer this card will
+   give the moment a render lands. */
+.segbtn:disabled {
+  color: #55554a;
+  cursor: not-allowed;
+}
+
+.segbtn:disabled:hover {
+  border-color: var(--line);
+}
+
+.segbtn.selected:disabled {
+  border-color: #6b6410;
+  color: #6b6410;
+}
+
+/* Under the source buttons, and only on the maps whose own preview left a start
+   position unmarked. */
+.spawnopt {
+  font-size: 11px;
+}
+
+/* What a re-render of this one map is doing. Persistent, unlike .saved: a run
+   takes seconds and the answer is the point. */
+.rendernote {
+  color: var(--dim);
+  font-size: 12px;
+}
+
+/* The two actions that are not Save sit together at the right: one costs a
+   render, the other is destructive, and neither is a second Save. */
+.rerender {
+  margin-left: auto;
+}
+
+.forget {
+  color: var(--dim);
+}
+
+.forget:hover {
+  border-color: #d9534f;
+  color: var(--ink);
+}
+
+.saved {
+  color: var(--accent);
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.saved.show {
+  opacity: 1;
+}
+
+.empty {
+  max-width: 70ch;
+  color: var(--dim);
+}
+
+/* A preview is now something you click, and our render is worth telling apart
+   from the map's own at a glance. */
+.card img.shot {
+  cursor: zoom-in;
+}
+
+.card img.rendered {
+  border-color: var(--accent);
+  /* Our render is a photograph of the terrain, not a 2px-per-cell bitmap, so it
+     gets smoothed down rather than blown up in blocks. */
+  image-rendering: auto;
+}
+
+.opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dim);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.linkbtn {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--dim);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline dotted;
+  cursor: pointer;
+}
+
+.linkbtn:hover {
+  color: #fff;
+}
+
+/* --- ladder pool ----------------------------------------------------------- */
+
+/* What the sample is a claim about — how many players and matches it counted,
+   the period they were played over, and the day it was taken. It rides in the
+   summary so a folded panel still states it: a pool you cannot see the period
+   of is a pool you have to open to trust. */
+.poolInfo {
+  margin-left: 8px;
+}
+
+/* Two columns of rows rather than one long list: twenty-odd map names is a
+   scroll on one column and a glance on two. Wide enough for a row's whole tail
+   — the file name and the verdict on it — because a column that squeezes those
+   spends the space on an ellipsis in the map's name instead. */
+.poollist {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
+  gap: 2px 18px;
+}
+
+.poolrow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  cursor: pointer;
+}
+
+.poolname {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The evidence behind the tick — how often the map came up and when it was last
+   played. Dim, because it is there to be checked, not read. */
+.poolstat {
+  flex: 0 0 auto;
+  color: var(--dim);
+  font-size: 11px;
+}
+
+/* A resolved file name is a *name*, not a verdict, so it reads in the same ink
+   as the title above it rather than in green — the row's colour belongs to the
+   mark at the end of the line, and two green things in one row read as
+   decoration. What the name still carries is failure: red when the sample could
+   not resolve it, because that is not a name at all. */
+.poolfile.ok {
+  color: var(--ink);
+}
+
+.poolmark.ok {
+  color: var(--ok);
+}
+
+.poolfile.bad,
+.poolmark.bad {
+  color: var(--bad);
+}
+
+.poolmark.warn {
+  color: var(--warn);
+}
+
+/* The last match, shown only when it is not the day of the sample — so every
+   one of these is a row that stopped coming up before the ladder was read. */
+.poolage {
+  color: var(--stale);
+}
+
+/* An unticked map keeps its numbers but stops claiming to be part of the set. */
+.poolrow:has(input:not(:checked)) .poolname {
+  color: var(--dim);
+  text-decoration: line-through;
+}
+
+/* --- a collapsible block, and a panel's own control bar ------------------- */
+
+/* The ladder pool and the alignment sample: set up once, then folded away. Both
+   are boxes on the page's ground, so a tab holding one still reads as a sheet
+   rather than as loose controls. */
+.align {
+  margin: 18px 0 16px;
+  padding: 8px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.align summary {
+  cursor: pointer;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: var(--dim);
+}
+
+.align[open] summary {
+  color: var(--ink);
+  margin-bottom: 10px;
+}
+
+/* Shared by the ladder panels and the alignment one: a row of controls with a
+   status line that takes the slack. */
+.alignbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+/* A bar that is not inside a box needs the gap the box's own margin gives the
+   ladder panels — the log tab's bar, for one. */
+.tabpanel > .alignbar {
+  margin-top: 18px;
+}
+
+/* Two bars running are one bar the panel could not hold on a line: the second
+   carries on where the first stopped and takes no gap of its own, or the pair
+   reads as two unrelated strips. */
+.tabpanel > .alignbar + .alignbar {
+  margin-top: 0;
+}
+
+/* The map a sample is taken of. Wide enough for a full map title, capped so a
+   long one does not push the button out of the bar. */
+.samplemap {
+  max-width: 320px;
+  margin-left: 6px;
+}
+
+.alignhint {
+  flex: 1 1 260px;
+  color: var(--dim);
+  font-size: 12px;
+  text-align: right;
+}
+
+/* A status that belongs to the control beside it rather than to the bar it is
+   in: the cameo harvest reports on the run its own button started, and wearing
+   .alignhint put that line at the far right end of a wide settings group, a
+   hand's width from the button. No flex of its own, so it follows the gap. */
+.runhint {
+  color: var(--dim);
+  font-size: 12px;
+}
+
+/* A word that joins two controls, and nothing else: `or` between the two ways
+   into a replay. It used to wear .alignhint, which takes a bar's slack — so the
+   one word on the row that means "either of these" was drawn at the far end of
+   a hand's width of nothing, with the two things it joins nowhere near it. */
+.alignsep {
+  color: var(--dim);
+  font-size: 12px;
+}
+
+/* One horizontal line above the stage. It used to be the right-hand end of
+   .alignbar, where it was the longest thing in the row and wrapped the bar to a
+   second line — and every line the bar wraps to is a line the body starts
+   lower by. Its own class, not .alignhint: that one is the status text at the
+   right end of a bar, and the log tab still uses it that way. */
+.stagehint {
+  margin: 0 0 6px;
+  color: var(--dim);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* The store's own list: one line a map. A row is a label, so the whole line
+   ticks its box. */
+.storedlist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.storedrow {
+  display: grid;
+  grid-template-columns: auto 72px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.storedrow:hover {
+  border-color: var(--line);
+  background: var(--panel);
+}
+
+.storedthumb {
+  width: 72px;
+  height: 44px;
+  object-fit: cover;
+  background: #000;
+  border-radius: 2px;
+  color: var(--dim);
+  font-size: 11px;
+  line-height: 44px;
+  text-align: center;
+}
+
+.storedtext {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.storedfacts {
+  color: var(--dim);
+  font-size: 12px;
+}
+
+/* An offset that failed to parse is not a passing note — it stays up until the
+   text it is about is fixed. */
+.saved.bad {
+  color: var(--bad);
+}
+
+/* Full size means full size: the whole viewport, the image scaled to fit, and
+   one click anywhere to get out. */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.9);
+  cursor: zoom-out;
+}
+
+.lightbox[hidden] {
+  display: none;
+}
+
+/* The image and its badge layer move as one thing: the viewer transforms the
+   stage, so a badge stays on its building through every zoom and pan without
+   any of the drawing knowing what the current scale is. */
+.lightbox-stage {
+  position: relative;
+  display: flex;
+  /* Zoom is a transform on top of the fitted size, so the layout never moves and
+     the maths only ever deals with one box. */
+  transform-origin: center center;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.lightbox-stage:active {
+  cursor: grabbing;
+}
+
+.lightbox img {
+  display: block;
+  max-width: 96vw;
+  max-height: 92vh;
+  object-fit: contain;
+  -webkit-user-drag: none;
+}
+
+/* Sized and placed in script, from the image's own box — with max-width and
+   max-height and no explicit size, that box is the picture exactly. */
+.lightbox-icons {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+
+.lightbox-icons[hidden] {
+  display: none;
+}
+
+/* Zoomed in, the pixels are the point — smoothing them defeats the render. */
+.lightbox-stage.zoomed img {
+  image-rendering: pixelated;
+}
+
+.lightbox-hint {
+  position: fixed;
+  bottom: 12px;
+  color: var(--dim);
+  font-size: 12px;
+}
+
+/* --- the log -------------------------------------------------------------- */
+
+/* One screenful with its own scrollbar rather than a page that grows to four
+   hundred rows: the log is read at its end, and a page-length list puts that
+   end below the fold every time the tab is opened. */
+.loglist {
+  display: flex;
+  flex-direction: column;
+  max-height: min(70vh, 720px);
+  overflow-y: auto;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  font: 12px/1.45 ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.logrow {
+  display: grid;
+  grid-template-columns: 62px 54px 1fr;
+  gap: 10px;
+  padding: 1px 0;
+  /* A line long enough to wrap is nearly always the interesting one, so it
+     wraps under the message column rather than being cut off. */
+  align-items: start;
+}
+
+.logtime,
+.logsrc {
+  color: var(--dim);
+}
+
+.logmsg {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.logrow.warn .logmsg {
+  color: var(--warn);
+}
+
+.logrow.error .logmsg {
+  color: var(--bad);
+}
+
+/* --- the replays tab's shortcuts ------------------------------------------ */
+
+/* Two panes between the boxes and the report. They extend the vocabulary
+   src/replay-view.css sets for a listed match — a remembered replay IS one of
+   those rows — and live here rather than there because the site vendors that
+   file and has neither pane: its way into a replay is a dropped file, and no
+   file handle survives a page.
+
+   Side by side, each under the box that fills it: the replays that have been
+   opened sit under the box a replay is pasted into, the names that have been
+   asked about sit over the list that answering one draws. Stacked full width
+   they were mostly air — a listed match is four short columns — and every line
+   they took pushed the report, which is what the tab is for, further down. */
+.replaypanes {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin: 14px 0;
+}
+
+.replaypanes[hidden],
+.replaypane[hidden] {
+  display: none;
+}
+
+/* Half the row each, and no wider than that half when it is alone: a pane that
+   stretched to the page on its own would put back the empty middle the two
+   panes were made to close, and the eye would have to find the list at a new
+   width every time the other pane appeared. `min-width: 0` because the rows
+   inside truncate rather than push — without it a long map name sets the floor
+   for the whole pane. */
+.replaypane {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 700px;
+}
+
+/* One line above each list, and the reason both panes have one even where the
+   left has nothing to put beside its title: a head of the same height is what
+   starts the two lists on the same line, and two lists a few pixels out of step
+   read as a mistake rather than as two panes. */
+.replaypanehead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-height: 30px;
+  margin-bottom: 4px;
+}
+
+/* What the pane holds, said once above it. Small and dim: it names a shortcut
+   list, and a heading louder than the rows under it would read as a section of
+   the report. */
+.replaypanetitle {
+  margin: 0;
+  color: var(--dim);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+}
+
+/* The names, on the pane's head line after the title they fill. */
+.replayrecents {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+
+.replayrecents[hidden] {
+  display: none;
+}
+
+.replayrecentlabel {
+  color: var(--dim);
+  font-size: 12px;
+}
+
+.replayrecentnames {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Name and × as one object: the × belongs to the name beside it, and a gap
+   between them would let a mis-click land on the next name's delete. */
+.replayrecentname,
+.replayrecentrow {
+  display: flex;
+  align-items: stretch;
+}
+
+.replayrecentname {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+}
+
+.replayagain {
+  padding: 2px 8px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.replayagain:hover {
+  color: var(--accent);
+}
+
+/* Faint until the row it belongs to is under the pointer, and never invisible:
+   a list where every row carries a bright × reads as a list of delete buttons,
+   and one where the × only exists on hover cannot be found by anyone looking
+   for it. */
+.replayforget {
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: var(--line);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.replayrecentname:hover .replayforget,
+.replayrecentrow:hover .replayforget,
+.replayforget:focus-visible {
+  color: var(--dim);
+}
+
+.replayforget:hover {
+  color: var(--bad);
+}
+
+/* Both lists scroll at the same height, so the two panes end on one line and
+   the report starts on one line whichever of them is longer. Six rows: enough
+   that a list is a list, short enough that the report is still the first thing
+   under the boxes — which is the whole point of a shortcut. */
+.replaypane .replaylist {
+  max-height: 16em;
+  margin-bottom: 0;
+}
+
+.replayrecentrow .replaymatch {
+  flex: 1;
+  /* The row truncates its own columns; without this the widest map name in the
+     list decides how wide the pane is, and the × is pushed off the end. */
+  min-width: 0;
+}
+
+/* The re-run speed box on the Replays tab: a number, not a paragraph. Four
+   digits and the spinner, which is every value it can hold — 5000 is the
+   maximum the control accepts. */
+.paceinput {
+  width: 4.6em;
+}
+
+/* --- Build chords ---------------------------------------------------------
+
+   The grid editor. It is a picture of a keyboard, so the geometry is the point:
+   five columns, three rows, in the order the fingers find them. Everything else
+   borrows the build-hotkeys panel above it — the side buttons are literally its
+   .buildside. */
+
+.chordtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 8px;
+}
+
+.chordtab {
+  padding: 3px 10px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  color: var(--dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chordtab:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
+.chordtab.on {
+  color: var(--ink);
+  border-color: var(--accent);
+  background: rgba(255, 224, 0, 0.1);
+}
+
+/* A second row of settings, for a group that cannot share a column. */
+.settings + .settings {
+  margin-top: 34px;
+  padding-top: 26px;
+  border-top: 1px solid var(--line);
+}
+
+/* The chord grid is five 88px cells and their gaps — 460px of geometry that
+   cannot be reflowed, because the whole point of the block is that it looks like
+   the keys it stands for. So its group sets its own width instead of taking a
+   quarter of the row: in the four-up row it overflowed into its neighbour and
+   put a scrollbar on the page that scrolled past the end of everything.
+
+   The cell is wider than the picture on purpose. It was 76px — the cameo plus
+   its border — and every name over eleven characters was cut to an ellipsis
+   (`Chrono Legio…`, `Aircraft Car…`), which is the one thing the cell is there
+   to say. 88px is the longest word any buildable object has (`Headquarters`,
+   `Construction`) plus its air, so a name now wraps instead of being cut. */
+.setgroup-wide {
+  /* No cap of its own: it holds two columns now, and each of them caps itself. */
+  max-width: none;
+}
+
+/* Two columns inside it — what the feature is, and what you can press.
+
+   Seven paragraphs stand between the heading and the first tick box, because
+   the feature is that large, and read down one column they put the grid — the
+   thing all of it is explaining — below the fold. Side by side, the explanation
+   keeps its reading width and the controls start at the top. The width was
+   there for the taking: this group is the only one in its row. */
+.chordsplit {
+  display: flex;
+  align-items: flex-start;
+  gap: 44px;
+}
+
+.chordprose {
+  /* Shrinks before the controls do: prose reflows and 460px of grid does not. */
+  flex: 0 1 74ch;
+  min-width: 0;
+}
+
+.chordcontrols {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+/* One under the other as soon as the two no longer fit: a reading column, the
+   gap, and the grid's own 460px, which is the part that cannot give. */
+@media (max-width: 1240px) {
+  .chordsplit {
+    display: block;
+  }
+
+  .chordcontrols {
+    margin-top: 18px;
+  }
+}
+
+.chordgrid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 88px);
+  gap: 5px;
+  margin-bottom: 12px;
+  /* The last resort, for a window too narrow even for one column of this: the
+     grid scrolls itself rather than handing the overflow to the page. */
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+/* One key, several object ids — whichever of them your country builds — drawn
+   as a hand of cards spread sideways, so the cell says "one of these" rather
+   than naming a picture that may not be yours.
+
+   **`display: block` is the whole fix.** This was a `<span>`, which is inline,
+   so its width and height were ignored, the box measured zero, and the cards —
+   absolutely positioned against it — were laid out from wherever the text
+   happened to be: they hung out over the neighbouring cell and the name flowed
+   in *beside* them instead of under them. Every complaint about this cell was
+   that one declaration.
+
+   The spread is horizontal and the box is exactly one cameo tall, so a deck
+   cell is the same height as every other cell and the row of names underneath
+   reads straight across. `--spread` is the width the whole hand gives up to the
+   cards behind, divided between them by `--of`: 20px of a 60px card is a third
+   of it, against the 4px sliver the old diagonal fan left. */
+.chorddeck {
+  --spread: 20px;
+  /* How many cards there are, set per deck by the page; the default keeps the
+     arithmetic below finite if it ever is not. */
+  --of: 2;
+  display: block;
+  position: relative;
+  width: calc(60px + var(--spread));
+  height: 36px;
+  margin: 0 auto;
+}
+
+.chorddeck .replaycameo {
+  position: absolute;
+  top: 0;
+  left: calc(var(--n) * var(--spread) / (var(--of) - 1));
+  /* Outlined so two cards read as two cards rather than as one misaligned
+     picture, and the ones behind are held back a little — enough to say which
+     is the card the name belongs to, not enough to stop them being read. */
+  outline: 1px solid var(--line);
+}
+
+.chorddeck .replaycameo:not(:last-child) {
+  opacity: 0.7;
+}
+
+.chordcell.isdeck .chordname {
+  color: var(--ink);
+}
+
+/* One cell is one key. The cameo is drawn at its native 60×36 with the name
+   under it, so the cell is as wide as the picture plus its border and the row of
+   five is as wide as the row of five keys. */
+.chordcell {
+  position: relative;
+  display: block;
+  padding: 5px 4px 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.chordcell:hover {
+  border-color: var(--accent);
+}
+
+.chordcell.on {
+  border-color: var(--accent);
+  background: rgba(255, 224, 0, 0.12);
+}
+
+/* An empty key keeps its shape and its letter — the grid is a keyboard, and a
+   collapsed cell would move every key after it. */
+.chordcell.empty {
+  min-height: 62px;
+  border-style: dashed;
+  opacity: 0.55;
+}
+
+.chordcell .replaycameo {
+  margin: 0 auto;
+}
+
+.chordkey {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 14px;
+  padding: 0 3px;
+  background: var(--bg);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  color: var(--accent);
+  font-size: 10px;
+  font-style: normal;
+  line-height: 15px;
+}
+
+/* The name wraps rather than being cut. Three lines is what the longest name a
+   roster holds needs at this width — `Airforce Command Headquarters` — and the
+   cut is kept as the backstop for anything longer, with the whole name on the
+   cell's `title`. */
+.chordname {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--dim);
+  overflow: hidden;
+  overflow-wrap: break-word;
+}
+
+.chordedit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.chordslotname {
+  min-width: 64px;
+  color: var(--dim);
+  font-size: 12px;
+}
+
+/* The backup tab. Four tick boxes on one row, two summaries that are short
+   lists rather than tables — the counts are the whole of what a summary can
+   honestly say — and the file itself in a box the width of the page, because a
+   third column of JSON is unreadable at 62ch. */
+.backupwhat {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 14px;
+}
+
+.backupsummary {
+  margin-top: 10px;
+  color: var(--dim);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.backupsummary ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.backuphead {
+  margin: 0;
+  color: var(--ink);
+}
+
+.backupfile {
+  margin-top: 34px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.backuptext {
+  width: 100%;
+  height: 240px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--ink);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  resize: vertical;
+}

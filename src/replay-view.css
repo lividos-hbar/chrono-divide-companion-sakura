@@ -1,0 +1,1025 @@
+/**
+ * How a replay report looks — the counterpart to src/replay-view.js.
+ *
+ * Lifted out of src/options.css on 2026-08-16 together with the renderer, for
+ * the same reason: the published site draws the same report and must not carry
+ * a second copy of it. `site/build.mjs` vendors this file.
+ *
+ * The report carries its own palette rather than inheriting the page's. The two
+ * hosts have different vocabularies for the same idea — the extension's `--ink`
+ * is its text, the site's `--ink` is the darkest ground it paints on — and a
+ * report that inherited both names would come out black on black on one of
+ * them. Set these on the container to re-theme it; the two series colours are
+ * validated as a pair (see below) and should move together if they move at all.
+ */
+.replayreport,
+.replaylist {
+  --bg: #12120f;
+  --panel: #1c1c18;
+  --line: #34342c;
+  --ink: #e8e6dd;
+  --dim: #9a978a;
+  --accent: #ffe000;
+  --ok: #9de89d;
+  --bad: #ffb0a5;
+  --taken: #4ad9d0;
+  --ceded: #c07a2b;
+  --deployed: #d7a8ff;
+}
+
+
+/* A listed match is a button because clicking it is what it is for; it is laid
+   out as a row of columns so a scan down the list reads as a table without one
+   being built. */
+.replaylist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 30vh;
+  overflow-y: auto;
+  margin-bottom: 14px;
+}
+
+/* Four columns, two of them fixed at what they actually print: a date is one
+   width for every row and a verdict is two words, and the 150/130 they used to
+   be was a hand's width of nothing inside each. What the text columns do with
+   the rest depends on how wide the list has been made — the options page runs
+   two of them side by side, this page runs one — so they share it and truncate
+   rather than wrap: a row is a way into a match, and a match found by scanning
+   dates and maps is not helped by a name that took a second line. */
+.replaymatch {
+  display: grid;
+  grid-template-columns: 124px minmax(0, 1fr) minmax(0, 1fr) 84px;
+  gap: 10px;
+  align-items: baseline;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.replaymatch:hover:not(:disabled) {
+  border-color: var(--line);
+  color: var(--accent);
+}
+
+.replaymatch.active {
+  border-color: var(--accent);
+}
+
+.replaymatch:disabled {
+  color: var(--dim);
+  cursor: default;
+}
+
+.replaywhen,
+.replayvs {
+  color: var(--dim);
+}
+
+/* Every column is one line, cut with an ellipsis where it does not fit. The
+   full text is on the cell's own tooltip — see `renderList` in both hosts — so
+   nothing a row says is only available by widening the window. */
+.replaymatch > * {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.replayresult {
+  text-align: right;
+  color: var(--dim);
+}
+
+.replayresult.win {
+  color: var(--ok);
+}
+
+.replayresult.loss {
+  color: var(--bad);
+}
+
+.replayhead {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.replayhead h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+/* What is known about the match, one element per fact. The ` · ` between them
+   was the last separator on this page drawn as a character — air measured in
+   glyphs, untunable, copied out with the line and wrapped as if it were a word.
+   A rule and a gap instead, the same hairline the header's middle column is
+   drawn with, so the two read as one vocabulary. */
+.replayfacts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  color: var(--dim);
+}
+
+.replayfact + .replayfact {
+  margin-left: 12px;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+
+/* Pushed to the far end of the head line: it is a control, not a fact about the
+   match, and the two should not read as one list. Only the first is pushed —
+   `auto` on every one of them shares the slack out between them instead, and
+   the three switches this line now carries were three lone controls strung
+   across the width of the page with nothing between them. */
+.replaytoggle {
+  margin-left: auto;
+  color: var(--dim);
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.replaytoggle + .replaytoggle {
+  margin-left: 0;
+}
+
+/* The two sides, and the charts, are drawn in these and nothing else is. Blue
+   and orange out of the data-viz reference palette, stepped for a dark surface
+   and validated as a pair against this page's own panel colour: worst CVD ΔE
+   26.8 (protan), normal-vision ΔE 31.8, both over 3:1 against #1c1c18. */
+.replayreport {
+  --series-1: #3987e5;
+  --series-2: #d95926;
+}
+
+/* The timeline. Three columns: a side, the clock, the other side — and the
+   clock column is fixed so it stays a straight line down the middle whatever
+   the rows say. Each side reads outwards from it, which is what makes two build
+   orders comparable at a glance instead of by hunting a time in a second list. */
+.replayaxis {
+  display: flex;
+  flex-direction: column;
+  /* Narrower than the panel and centred: the point of the layout is a short
+     journey for the eye between one side and the other, and a row stretched
+     across a 1400px window puts the two build orders as far apart as the two
+     columns it replaced. */
+  width: min(100%, 1040px);
+  margin: 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  padding: 8px 10px;
+}
+
+/* Five columns, not three: a picture gutter outside each side's text.
+   `--cdc-cameo-gutter` is written by the renderer from the largest picture the
+   report actually uses, and is 0 when the icons are off — the columns collapse
+   and the layout is the three it always was. It is set on the axis and on the
+   header separately, because they are two grids that must agree about where the
+   clock is. */
+/* A side's column is **as wide as its widest line and no wider**, so the picture
+   beside it sits as close to the clock as the text ever gets. `1fr` put the
+   pictures out at the panel's edge with a lake of nothing between them and rows
+   that happened to be short.
+
+   **A column per side, and each one its own width.** One shared number padded
+   the quieter side out to the busier one's longest line, which put its pictures
+   a centimetre off its own text. The renderer counts each column separately and
+   hands them over as `--cdc-line-ch-s1` and `--cdc-line-ch-s2` — the longest
+   line in characters, which is exact here because the axis is set in a monospace
+   face and is why this needs no measuring pass, plus the ten pixels a cell keeps
+   between its words and the clock. Both grids read the same two variables, so
+   the header's clock stays over the axis's.
+
+   **The gutters take the slack, not the panel.** They used to be exactly as wide
+   as the widest picture, and the whole grid was then centred in a panel far
+   wider than it — so the report's own box had a strip of nothing down each edge
+   that nothing could ever be put in, while the header wrapped its chips into ten
+   lines inside a 115px column. A gutter is `minmax(picture, 1fr)` instead: the
+   three middle columns keep their exact widths, the two flexible edges split
+   whatever is left equally, and because they are equal the clock lands where
+   centring put it — `(W - s1 - clock - s2) / 2 + s1` either way. What changes is
+   that the free space is now *inside* two columns the header can be given (see
+   the spans below), rather than outside the grid entirely. A picture is unmoved:
+   its holder hugs the gutter's inner edge (`.replaycameorun`), so it still sits
+   as close to the text as the text ever gets. */
+.replayrow,
+.replayaxis {
+  /* How far a leader runs out of a row and into the gutter beside its picture —
+     read by `.replaylead` and by the bracket, which stands at the far end of it.
+     The rest of `.replaycameorun`'s 14px is the air before the picture. */
+  --cdc-leader-reach: 10px;
+  display: grid;
+  grid-template-columns:
+    minmax(var(--cdc-cameo-gutter, 0px), 1fr)
+    var(--cdc-line-ch-s1, 1fr)
+    var(--cdc-clock-ch, 56px)
+    var(--cdc-line-ch-s2, 1fr)
+    minmax(var(--cdc-cameo-gutter, 0px), 1fr);
+  align-items: baseline;
+  font: 12px/1.7 ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+/* The header rows carry three children and no pictures, so a side's block takes
+   its own column *and the gutter outside it* — two columns, not one.
+
+   A header cell is prose and chips, not a line of the axis: it wraps, and how
+   wide it may be before it wraps is the whole question. Bound to the middle
+   column it was as wide as the longest line of the build order below — 115px on
+   the fixture — and a side's losses came out as ten stacked chips beside two
+   strips of empty panel. Spanning the gutter it gets everything up to the panel's
+   edge, and the clock column between the two blocks does not move, because the
+   spans stop either side of it. */
+.replayrow > :nth-child(1) {
+  grid-column: 1 / 3;
+}
+.replayrow > :nth-child(2) {
+  grid-column: 3;
+}
+.replayrow > :nth-child(3) {
+  grid-column: 4 / 6;
+}
+
+/* The axis places every item itself — a line's three cells by row, and a run's
+   picture by row *and* span, which is the whole reason this is one grid rather
+   than a stack of them. A picture that spans four lines follows whatever those
+   four lines are actually tall; a stack of rows could only assume. */
+
+/* The header is rows of the same grid rather than two stacked columns: the
+   names face each other, the statistics face each other, the losses face each
+   other. Bottom-aligned columns put a blank line above the shorter side and the
+   same kind of fact at two different heights, which is what this replaced. */
+.replayheads {
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.replayrow.head {
+  font: inherit;
+}
+
+/* The header block lives *inside* the axis, so on a five-column grid it is an
+   item like any other: it takes the first row and the whole width, and the lines
+   start under it. It also means it inherits the axis's `--cdc-cameo-gutter`
+   without being told it — which is what keeps the clock under the clock. */
+.replayaxis > .replayheads {
+  grid-row: 1;
+  grid-column: 1 / -1;
+}
+
+/* Air between the kinds of line, none inside one: the losses of a side can wrap
+   over three lines and must still read as one block. */
+.replayheads .replayrow + .replayrow {
+  margin-top: 3px;
+}
+
+/* A line never wraps. Its column is exactly as wide as the longest line counted
+   in characters, and the few marks a row carries — `×`, `✓`, `−`, `⚑`, `⇄` —
+   come from a fallback face where they need not be exactly one cell wide. The
+   column used to carry a spare character for them, which is an empty character
+   between every line and its picture; overhanging a fraction of one into the
+   gutter's own padding costs nothing, and reflowing a row would cost a line. */
+.replaycell {
+  white-space: nowrap;
+  /* A row of parts rather than a run of text, so the leader in it can take
+     whatever the words leave over (see `.replaylead`). The words are still the
+     cell's own `textContent` — an anonymous item of this flex row — so nothing
+     that reads a cell's text has to know this happened. */
+  display: flex;
+  align-items: baseline;
+}
+
+/* Written towards the clock on the left of it, away from it on the right, which
+   is also what puts each side's leader on its outward edge. */
+.replayaxis > .replaycell.s1 {
+  justify-content: flex-end;
+}
+
+/* The leader: the rule from the picture to this row's own words, so a picture
+   points at the text rather than at the widest line in the column. It grows into
+   whatever the words left over — nothing at all on the longest line of the side,
+   which is the one that defines the column — and reaches out past the cell by
+   `--cdc-leader-reach` on a negative margin, into the gutter beside the picture.
+
+   **The whole horizontal is this one element.** It used to be two: this piece,
+   and an arm on the picture's holder in the gutter meeting it at the column
+   edge. They were placed by different rules — one centred in a flex line, one
+   offset half a line from a stretched grid item — and landed 0.5px apart, so the
+   two halves of one rule rounded onto the same device row at some zooms and onto
+   neighbouring rows at others. One element cannot disagree with itself. */
+.replaylead {
+  flex: 1 1 auto;
+  min-width: 0;
+  align-self: center;
+  border-bottom: 1px solid var(--line);
+}
+
+.replaycell.s1 .replaylead {
+  margin-left: calc(-1 * var(--cdc-leader-reach));
+}
+
+.replaycell.s2 .replaylead {
+  margin-right: calc(-1 * var(--cdc-leader-reach));
+}
+
+/* The left side is written towards the centre, the right one away from it, so
+   both build orders touch the clock they are being read against. */
+.replayrow > *:first-child,
+.replayaxis > .replaycell.s1 {
+  text-align: right;
+  padding-right: 10px;
+}
+
+.replayrow > *:last-child,
+.replayaxis > .replaycell.s2 {
+  text-align: left;
+  padding-left: 10px;
+}
+
+/* Dot, the rate, then the phrase that names the side — read outwards from the
+   clock on both sides, which is why the left one is written in reverse rather
+   than in a second DOM order. */
+.replayname {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 15px;
+}
+
+/* Every header cell left of the clock is written towards it, whatever kind of
+   cell it is: the block nearest the column is the one the row is about — the dot
+   and the rate on the name row, the number under the label on all the others. It
+   used to be named cell by cell, so a kind of row that was not on the list put
+   its headline at the far edge of the panel while its twin kept it against the
+   clock, and the pair stopped being comparable at a glance.
+
+   A block that takes a line of its own is mirrored too, or the numbers inside a
+   loss block would read left-to-right on a row whose every other part reads the
+   other way. */
+.replayrow.head > *:first-child,
+.replayrow.head > *:first-child .replaycount {
+  flex-direction: row-reverse;
+}
+
+/* **Flush against the middle column, both sides.** A header cell keeps none of
+   the air a line of the axis keeps off the clock: the column's own edges are the
+   boundary — the same x the axis's rules are drawn on — and text that stops
+   short of them is a second, softer edge a few pixels inside the first, which is
+   what a reader sees as a ragged column rather than as a table.
+
+   The air is inside the column instead, where it belongs: `--cdc-head-mid` is
+   the widest label plus `LABEL_AIR` either side (replay-view.js), so no number
+   ever touches a word. On the name row that leaves each side's dot exactly on
+   the boundary, which is what makes the pair of them read as the separator
+   either side of the clock. */
+.replayrow.head > *:first-child,
+.replayrow.head > *:last-child {
+  padding-inline: 0;
+}
+
+/* **The header's middle column is one column, and it is not the axis's.**
+
+   It is drawn as a table — a rule either side, running the height of the header
+   — and a table's column has one width down all of its rows. Which width is
+   whichever of the two things in that column is wider, and `--cdc-head-mid`
+   (set in replay-view.js) is that `max()`: on the `both` clock the reading is
+   `7:48 / 31:12` and the rules land either side of it, in the space between it
+   and the two dots; on a single clock no reading comes near the longest word, so
+   the widest label sets it.
+
+   Two earlier tries are what this replaced. Sized to the clock, a label longer
+   than a reading had to overhang its own column — fine at four characters, and
+   marooned in the 94px of a double reading, with two strips of dead panel either
+   side of it. Sized per row to its own word, nothing was marooned and nothing
+   lined up either: five rows, five different column edges, and no boundary to
+   read the numbers against.
+
+   The axis below keeps its own narrower column, counted off clock readings
+   alone. A label that widened *that* would push the two build orders apart down
+   the whole report. */
+.replayrow.head {
+  grid-template-columns:
+    minmax(var(--cdc-cameo-gutter, 0px), 1fr)
+    var(--cdc-line-ch-s1, 1fr)
+    var(--cdc-head-mid, var(--cdc-clock-ch, 56px))
+    var(--cdc-line-ch-s2, 1fr)
+    minmax(var(--cdc-cameo-gutter, 0px), 1fr);
+}
+
+/* Nickname then faction — mirrored with the cell, so the **nickname is the inner
+   word on both sides** and the two of them face each other across the middle of
+   the header. Unmirrored it read `Player_A Great Britain │ … │ Player_XYZ Korea`,
+   with a faction between each nickname and the clock on one side only.
+
+   The verdict is not in here. It was, and it was mirrored with the phrase, which
+   put the two verdicts at the header's two outer edges — the first thing anyone
+   opens a match for, as far apart as the layout allows. */
+.replaywho {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.replayrow.head > *:first-child .replaywho {
+  flex-direction: row-reverse;
+}
+
+/* The row's name, said once for both sides, in the column the rules are drawn
+   on. It is the widest of them that sets that column's width (`--cdc-head-mid`),
+   so no label ever reaches the axis's own clock column below — which is the whole
+   point: `time` used to be a caption over *that* column, and four characters of
+   caption on a report whose longest reading is `8:54` is a strip of nothing down
+   the middle of every line of the build order.
+
+   The column is the boundary — the width `--cdc-head-mid` sets and the air the
+   cells either side keep off it. Not a drawn rule: the header is read as a table
+   because its columns line up, and a hairline down the middle of a five-row block
+   is a second claim nobody asked it to make. */
+.replaylabel {
+  width: max-content;
+  justify-self: center;
+  color: var(--dim);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Everything a side still owned when it left is destroyed in one instant, which
+   is not a fight it lost. Said in the colour the report already uses for a loss,
+   so the two blocks of chips are never added up by eye. */
+.replaylabel.atdefeat {
+  color: var(--bad);
+}
+
+.replaydot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+}
+
+.replaydot.s1 {
+  background: var(--series-1);
+}
+
+.replaydot.s2 {
+  background: var(--series-2);
+}
+
+.replayside,
+.replaystats {
+  color: var(--dim);
+  font-size: 12px;
+}
+
+/* A run of numbers laid out as a row, so the left-hand one can be mirrored by
+   the stylesheet rather than by a second DOM order — and held apart by the row
+   itself.
+
+   The `·` between the parts is gone with the spaces that were holding it off
+   them. Every part now says what it is (`40 total`, `10 buildings`, `30 units`),
+   so there is nothing for a dot to disambiguate, and the air between them is one
+   number here rather than two non-breaking spaces per separator in the markup
+   (see `writeSentence`). */
+.replaystats,
+.replaycount {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 12px;
+}
+
+
+/* The clock: the one column every row shares, and the only one that is centred.
+   `tabular-nums` keeps the colons under each other, which is what makes the
+   column read as an axis rather than as a third list. */
+.replayat {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  white-space: nowrap;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* One reading, and the rule between two of them.
+
+   A match has two clocks and the `both` mode prints the pair. That pair was
+   `8:55 (35:42)`, then `8:55 / 35:42`, and both were a separator drawn as a
+   character — which cannot be tuned, is copied out with the line, and takes a
+   share of a column counted in characters. It is a rule now, like every other
+   separator here, and its width is measured rather than counted: `CLOCK_RULE` in
+   replay-view.js is these two margins and this hairline, and has to match. */
+.replaytime + .replaytime {
+  margin-left: 6px;
+  padding-left: 6px;
+  border-left: 1px solid var(--line);
+}
+
+/* The divider: the clock column carries the only vertical rules on the page, so
+   the axis reads as one line rather than as a number repeated down the middle. */
+.replayaxis > .replayat {
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+
+/* A placement is a building that exists; an order is an intent. The two are not
+   the same claim and are not painted alike. */
+.replaycell.built {
+  color: var(--accent);
+}
+
+.replaycell.cancelled {
+  color: var(--dim);
+  text-decoration: line-through;
+}
+
+/* A building that was ordered and never stood: the same claim as an order, and
+   the dashed rule says the row stops there rather than continuing into a
+   placement somewhere below. */
+.replaycell.unplaced {
+  color: var(--dim);
+  border-bottom: 1px dashed var(--line);
+}
+
+/* The sidebar cameo, drawn from one sheet the report installs as
+   `--cdc-cameo-sheet` (see cameoFor in replay-view.js). The renderer writes three
+   numbers per icon — `--cx`/`--cy`, where the picture is in the sheet, and `--k`,
+   how big to draw it — and the arithmetic is done here rather than assembled into
+   strings in JS, because geometry written out is geometry that can be read.
+
+   `--k` is only ever 0.5, 1 or 2, so the source's own 60×36 is halved or doubled
+   and never resampled; `pixelated` keeps that true on a 1× display, where the
+   browser would otherwise smear it. */
+.replaycameo {
+  --k: 0.5;
+  display: block;
+  position: relative;
+  width: calc(60px * var(--k));
+  height: calc(36px * var(--k));
+  border-radius: 2px;
+  background-image: var(--cdc-cameo-sheet);
+  background-size: calc(var(--cdc-cameo-w) * var(--k)) calc(var(--cdc-cameo-h) * var(--k));
+  background-position: calc(var(--cx) * var(--k) * -1) calc(var(--cy) * var(--k) * -1);
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+
+/* A picture of something that was destroyed, said in the colour the report
+   already uses for a loss. The sheet has one cameo per object however it ends —
+   the same War Miner art for the one that was delivered and the one that died —
+   so a run of losses is marked on the picture rather than left to the words
+   beside it, and the axis reads as a base coming apart at a glance.
+
+   An overlay rather than a `filter`, and blended on **colour** rather than
+   multiplied: `multiply` under a flat pink lands wherever the art happens to be
+   light, so a Conscript came out unmistakably red and a Tesla Reactor — dark
+   blue art — came out unchanged, which is the one thing a mark may not do.
+   `color` takes the overlay's hue and the picture's own luminance, so every
+   cameo goes the same red and keeps its own shapes. */
+.replaycameorun.lost .replaycameo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--bad);
+  mix-blend-mode: color;
+  opacity: 0.85;
+}
+
+/* And a touch darker under it, so the mark reads as a mark and not as a picture
+   that happens to be red. */
+.replaycameorun.lost .replaycameo {
+  filter: brightness(0.82) contrast(1.05);
+}
+
+/* A run's holder owns the whole gutter beside the lines it covers, so the
+   picture sits centred against them however tall they turn out to be — and
+   however far apart the opponent's rows have pushed them. */
+.replaycameorun {
+  position: relative;
+  display: flex;
+  align-items: center;
+  /* **Not baseline**, which the grid aligns everything else by. A block box with
+     no text in it has its baseline at its bottom edge, so a picture asks to have
+     its whole height put *above* the line it starts on — a 72px one opens a
+     50px band of nothing over the row, which is exactly what it did. Stretching
+     over the rows it spans is also what a run's picture means. */
+  align-self: stretch;
+}
+
+.replaycameorun.s1 {
+  justify-content: flex-end;
+  padding-right: 14px;
+}
+
+.replaycameorun.s2 {
+  justify-content: flex-start;
+  padding-left: 14px;
+}
+
+/* The bracket: the upright joining the leaders of the first and last row of a
+   run, saying that every line between them is about the one picture beside it.
+   Only on a run — a single row's leader says all there is to say, and a bracket
+   around one line would be a claim with no content.
+
+   It carries no horizontal of its own. The arms are the rows' own leaders, which
+   reach out here across `--cdc-leader-reach`; this stands at the far end of that
+   reach so the three meet as one bracket. Drawing an arm here as well is what put
+   half a rule half a pixel above the other half.
+
+   Half a line in at each end, so it spans from the **text** of the first row to
+   the text of the last rather than from the picture's own top and bottom — a
+   line is 1.7em, so its middle is 0.85em from either edge. The extra pixel at
+   each end is deliberate: the upright is placed against the holder, the leaders
+   against their own rows, and a pixel of overlap closes the corner where a
+   rounding difference would otherwise open a gap in it. */
+.replaycameorun.braced::before {
+  content: "";
+  position: absolute;
+  top: calc(0.85em - 1px);
+  bottom: calc(0.85em - 1px);
+  width: var(--cdc-leader-reach);
+}
+
+.replaycameorun.braced.s1::before {
+  right: 0;
+  border-left: 1px solid var(--line);
+}
+
+.replaycameorun.braced.s2::before {
+  left: 0;
+  border-right: 1px solid var(--line);
+}
+
+/* A cancelled order is struck through, and a line through a picture reads as
+   damage to the picture rather than as a claim about the row. */
+.replaycell.cancelled .replaycameo {
+  opacity: 0.45;
+}
+
+/* Clicks the queue could not take. Dim and small on purpose — they sit beside a
+   count of real units and must never be read as part of it. */
+.replayover {
+  color: var(--dim);
+  font-size: 11px;
+}
+
+.replaycell:hover:not(.empty) {
+  background: #ffffff0d;
+}
+
+.replaycols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.replaycol {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+}
+
+.replaycol h4 {
+  margin: 0 0 2px;
+  font-size: 15px;
+}
+
+.replayorder {
+  display: flex;
+  flex-direction: column;
+  font: 12px/1.6 ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+/* --- the charts ----------------------------------------------------------- */
+
+.replaycharts {
+  display: grid;
+  /* Wide enough that a chart squeezed side by side is still readable; below it
+     they stack and each gets the whole width, which is better than two
+     unreadable ones. */
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.replaychart {
+  margin: 0;
+  padding: 10px 12px 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+}
+
+.replaychart figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+/* The caption carries what the curve is *not*, so nothing here has to be read
+   generously. */
+.replaychart figcaption span {
+  color: var(--dim);
+  font-size: 12px;
+}
+
+.replaylegend {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.replaylegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.replayplotwrap {
+  position: relative;
+}
+
+.replayplot {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+/* Recessive, both of them: the grid is there to be measured against, not read. */
+.replaygrid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.replaytick {
+  fill: var(--dim);
+  font: 10px/1 "Segoe UI", system-ui, sans-serif;
+}
+
+.replaytick.end {
+  text-anchor: end;
+}
+
+.replaytick.mid {
+  text-anchor: middle;
+}
+
+.replayline {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.replayline.s1 {
+  stroke: var(--series-1);
+}
+
+.replayline.s2 {
+  stroke: var(--series-2);
+}
+
+.replaycross {
+  stroke: var(--ink);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+.replayhit {
+  fill: transparent;
+}
+
+/* The readout follows the crosshair along the plot and is translated back by
+   half its own width, so it is centred on the time it is naming until it would
+   leave the panel. */
+.replayreadout {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.replayreadout[hidden] {
+  /* `display: flex` above outranks the [hidden] rule every browser ships, so
+     without this the box sits in the corner of every chart nobody is hovering. */
+  display: none;
+}
+
+.replayreadout span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--dim);
+}
+
+.replaychat {
+  margin-top: 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--dim);
+  font: 12px/1.6 ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+/* What a side lost, by name — the one part of the header that did not come out
+   of the replay file, and the longest. Every type is shown, so it is laid out as
+   chips that wrap: the same list as a sentence of `A ×23 · B ×16 · …` was a
+   paragraph, and it was read as one. */
+.replaylost {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 6px;
+  color: var(--dim);
+  font-size: 12px;
+}
+
+/* How many went, ahead of the list of what — the answer the reader came to the
+   block for, so it leads it on the clock's side, **on a line of its own**.
+
+   `flex-basis: 100%` is what makes it a line rather than three more items among
+   the chips: loose in the block, a chip wrapped up beside the numbers and landed
+   on the label's line, so `Chrono Miner ×4` read as part of the count it was
+   sitting in front of. Which stretch of the match this was is the middle
+   column's (`.replaylabel`), so what is left here is a number, and it takes the
+   weight rather than a caption's uppercase. */
+.replaycount {
+  flex-basis: 100%;
+  font-weight: 600;
+}
+
+/* One type, one chip: a base coming apart is a dozen of them, and a reader
+   looking for whether the Refinery went should find a word, not a clause. */
+.replaychip {
+  padding: 0 5px;
+  border-radius: 3px;
+  background: #ffffff0d;
+  white-space: nowrap;
+}
+
+/* A loss on the timeline. The third kind of row, and the only one that is
+   something happening *to* a side rather than something it did — so it is the
+   one colour on the axis that is not the page's accent, and it carries a minus
+   so it reads as a loss before any colour is. */
+.replaycell.lost {
+  color: var(--bad);
+}
+
+/* A building coming apart is not a conscript dying. Base losses are what a
+   reader is scanning for, and a run of them is a base being dismantled. */
+.replaycell.lost.structure {
+  font-weight: 600;
+}
+
+/* The other side of the same ledger: what came out of the queues, and like a
+   loss it exists only after the match has been re-run. Deliberately quieter than
+   an order — the orders are the build order a reader came for, and delivery is
+   the check on them. */
+.replaycell.made {
+  color: var(--ok);
+}
+
+/* A building that has finished and is waiting to be placed. The same hue as the
+   placement it is about to become, at less weight — the pair reads as one
+   sequence, and how far apart they sit is the thing worth seeing.
+
+   The quietest claim on the axis, and drawn as one: it is not an event a player
+   caused, it is the gap before the one below it. A row that landed in its own
+   placement's second is merged into that placement instead, so everything left
+   here is a real wait and should read as the faint prefix to the bright row
+   rather than as its equal. */
+.replaycell.ready {
+  color: var(--accent);
+  opacity: 0.45;
+}
+
+/* The readiness mark carried by a placement that finished and stood in the same
+   second. Dim for the same reason the readiness *row* is dim: that row is the
+   quietest claim on the axis — not an event a player caused, but the gap before
+   the one below it — and when there is no gap to show, the claim does not get
+   louder for being printed on the bright row instead. The `+` beside it is the
+   fact worth reading; this says how it got there.
+
+   The same 0.45 as `.replaycell.ready`, and inherited colour rather than a
+   colour of its own, so the two go on matching whatever the placement is painted
+   in. */
+.replayready {
+  opacity: 0.45;
+}
+
+/* A base standing up — an MCV deploying, which is the one row on the axis that
+   nobody ordered, paid for or was delivered. It is drawn in the one hue left
+   unused by anything on this page: 8.9:1 against the panel, and its nearest
+   neighbour anywhere in the palette is ΔE2000 28 away (`--bad`, and `--series-1`
+   at 29), against the 14.9 that already separates the capture pair.
+
+   Bright rather than quiet, and heavier than the buildings around it, because of
+   what it means where it appears — the first one is the match starting, and any
+   later one is a base that has relocated or a second one opening somewhere else.
+   A reader scanning a long timeline for where the geography changed should find
+   these without reading a word. */
+.replaycell.deployed {
+  color: var(--deployed);
+  font-weight: 600;
+}
+
+/* A building changing hands, drawn twice: the side that took it and the side it
+   came off, at the same second either side of the clock. It is always a
+   building, so it carries the weight a building loss carries — the axis says
+   "base" the same way wherever it happens. */
+.replaycell.taken,
+.replaycell.ceded {
+  font-weight: 600;
+}
+
+/* The side that took it. Cyan is the one hue nothing else on this page uses,
+   which is what a fact this rare is worth: 9.9:1 against the panel, and ΔE2000
+   20 from `--ok`, the nearest thing to it on the axis. */
+.replaycell.taken {
+  color: var(--taken);
+}
+
+/* And the side it was taken from — a dark orange, quieter than the taker's
+   cyan and reading at 4.9:1 against the panel. Deliberately not `--series-2`,
+   the orange the charts draw side two in: that one means *whose* line this is,
+   and a colour with two meanings is a legend nobody can use. ΔE2000 14.9 apart,
+   which is the distance between the same orange and another one. */
+.replaycell.ceded {
+  color: var(--ceded);
+}
+
+/* A side leaving the match — the one row on the axis that is about no object at
+   all, and the reason for the losses printed under it. Small caps rather than an
+   entry, so it reads as a caption over that stretch of the timeline instead of
+   as one more thing that was built or destroyed. */
+.replaycell.resigned,
+.replaycell.dropped,
+.replaycell.defeated {
+  color: var(--bad);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* A drop is not a decision — it is the client noticing the base is gone — so it
+   is stated more quietly than the two rows it sits between. Painting it like the
+   resignation would claim the player quit; painting it like the defeat would
+   claim it is the moment they lost, and it is the record of one. */
+.replaycell.dropped {
+  color: var(--dim);
+  font-weight: 500;
+}
+
+/* Who won. Beside the name, in the two colours the page already uses for a
+   settled verdict and a wrong one — and worth the weight, since it is the first
+   thing anyone opening a match wants to know and it used to be a word at the end
+   of a statistics line. */
+.replayverdict {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.replayverdict.won {
+  background: #9de89d1f;
+  color: var(--ok);
+}
+
+.replayverdict.lost {
+  background: #ffb0a51f;
+  color: var(--bad);
+}

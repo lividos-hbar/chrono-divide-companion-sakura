@@ -1,0 +1,3 @@
+# A replay file is bytes the parser reads exactly; a line-ending conversion
+# would corrupt one silently on a fresh checkout.
+*.rpl -text

@@ -1,0 +1,56 @@
+{
+  "manifest_version": 3,
+  "name": "Companion for Chrono Divide",
+  "version": "0.94.0",
+  "description": "Faction labels, per-map hints, a map preview, build hotkeys, settings backup and replay build orders for Chrono Divide.",
+  "minimum_chrome_version": "111",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": ["storage", "unlimitedStorage"],
+  "host_permissions": [
+    "https://replays-eu.chronodivide.com/*",
+    "https://replays-sea.chronodivide.com/*",
+    "https://wol-eu.chronodivide.com/*",
+    "https://wol-sea.chronodivide.com/*"
+  ],
+  "action": {
+    "default_title": "Companion for Chrono Divide — map guides and hotkeys",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "options_ui": {
+    "page": "src/options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://game.chronodivide.com/*"],
+      "js": ["src/frames.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://game.chronodivide.com/*"],
+      "js": ["src/glyphs.js", "src/build-chords.js", "src/queue-predict.js", "src/companion.js", "src/hq-preview.js", "src/replay-sim.js"],
+      "css": ["src/companion.css"],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://game.chronodivide.com/*"],
+      "js": ["src/bridge.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

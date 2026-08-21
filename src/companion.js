@@ -3464,7 +3464,7 @@
       // that gets here and finds no enums is a failed import at boot — which is
       // narrated once and then never mentioned again. Say it where the key was
       // pressed, or the key is simply dead.
-      buildNote("the client's action modules did not load — see the debug panel");
+      buildNote("the client's action modules did not load — run __cdc.probe()");
       return false;
     }
     const production = ui.player && ui.player.production;
@@ -4094,7 +4094,7 @@
     const { ActionType, UpdateType } = state.modules;
     if (!ui) return false;
     if (!ActionType || !UpdateType) {
-      buildNote("the client's action modules did not load — see the debug panel");
+      buildNote("the client's action modules did not load — run __cdc.probe()");
       return false;
     }
     const at = queueStateFor(object);
@@ -4197,7 +4197,7 @@
     const { QueueType } = state.modules;
     const production = state.combatant && state.combatant.player && state.combatant.player.production;
     if (!production || !QueueType) {
-      buildNote("the client's queue modules did not load — see the debug panel");
+      buildNote("the client's queue modules did not load — run __cdc.probe()");
       return false;
     }
     const candidates = [];
@@ -6720,10 +6720,10 @@
   }
 
   /**
-   * The panel itself is src/debug-hud.js, which the public build does not ship
-   * — see .publish.json. Absent, both handles are inert: the debug hotkey does
-   * nothing, `__cdc.debug()` answers false, and `note()` still renders nothing
-   * rather than throwing on every log line.
+   * The panel itself is src/debug-hud.js, which the public build does not ship.
+   * Absent, both handles are inert: the debug hotkey does nothing,
+   * `__cdc.debug()` answers false, and `note()` still renders nothing rather
+   * than throwing on every log line.
    *
    * `toggleHud` and `renderHud` stay function declarations, as they were, so
    * they remain hoisted for any caller that runs before this line — `note()` is

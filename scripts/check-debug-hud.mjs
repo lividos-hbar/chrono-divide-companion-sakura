@@ -3,8 +3,8 @@
  *
  *   node scripts/check-debug-hud.mjs
  *
- * `src/debug-hud.js` is dropped from the manifest in the public build (see the
- * transform in .publish.json), so `window.__cdcHud` is undefined there and
+ * `src/debug-hud.js` is dropped from the manifest in the public build, so
+ * `window.__cdcHud` is undefined there and
  * `src/companion.js` has to survive it. That is not a hypothetical: `renderHud`
  * is called from seven places, one of them inside `note()`, so a shim that
  * handed back only a toggle would take the diagnostics log down with the panel

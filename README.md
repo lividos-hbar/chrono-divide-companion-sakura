@@ -114,7 +114,7 @@ Three guards fail the build rather than warn:
 |---|---|
 | manifest sweep | a path the manifest names that is not in the package — `load unpacked` substitutes a placeholder icon, the store rejects the upload |
 | link sweep | a `src`/`href` on the options page that does not resolve, or that is absolute |
-| leak sweep | a Windows user directory, `AppData`, the operator's user name, an email, an extension id, a `Program Files` path — the same list `site/build.mjs` sweeps its own output for |
+| leak sweep | a Windows user directory, `AppData`, the operator's user name, an email, an extension id, a `Program Files` path — the same list the site build sweeps its own output for |
 
 `--dry` runs all three and writes nothing; `--force` overwrites a build of a
 version already packaged, which is otherwise refused because neither store lets
@@ -858,7 +858,10 @@ The extension's **options page** — click the extension's toolbar icon, or
 |---|---|
 | **Ladder 1x1** | the 1v1 ranked pool, and the guides of the maps it plays |
 | **Ladder 2x2** | the same instrument pointed at the 2v2 pool, which is a different set of maps |
+| **Stored maps** | everything this machine is holding, whatever ladder it belongs to — a ladder tab lists that pool's maps and nothing else |
 | **Overlay settings** | the hotkeys, and everything the extension draws over the game |
+| **Backup** | your bindings, plus the game's own hotkeys and options — which it keeps where you cannot copy them — into a single file |
+| **Log** | what the extension did, kept in storage so it outlives the tab that did it |
 | **Replays** | a ladder replay's build orders, read out of the file |
 
 A ladder tab lists that ladder's maps, each with its own preview and a free-form
@@ -894,8 +897,8 @@ It exists because the map file does not survive a render. A run fetches the
 bytes through the client's own `MapFileLoader`, parses them into a `MapFile`,
 draws it, and drops both — what is stored is pictures (`renders`, `full:<map>`),
 and a picture is not an index. So "does this map have airports" was answerable
-only by looking at a 3000px PNG, and the alignment panel, which has no client at
-all, could not answer it in any form.
+only by looking at a 3000px PNG — and on the options page, which has no client
+at all, not in any form.
 
 `__cdcHq.survey()` is the same walk as the render's with nothing drawn: **rules
 only, no theater**, so it costs no download and answers for a map whose art this
@@ -931,22 +934,22 @@ size in the same pixel space as this overlay. **Drag** the preview to move it,
 drag its bottom-right corner to resize; the position is remembered per browser.
 `__cdc.resetLayout()` puts it back on the radar.
 
-**Both keys are reassignable** under **Overlay settings** in the options page —
-click the key, press the combination. That matters because a hotkey can be taken by three layers and only
-you can see all three: the game, the browser, and Windows. Alt+Shift+G was the
-first casualty — **Alt+Shift is the Windows keyboard-layout switch**, so on a
-machine with two layouts it never reaches the page at all. Nothing defaults to
-Alt+Shift now. The one thing true of every key is a line of text above them;
+**Every one of these keys is reassignable** under **Overlay settings** in the
+options page — click the key, press the combination. That matters because a
+hotkey can be taken by three layers and only you can see all three: the game,
+the browser, and Windows. An Alt+Shift binding was the first casualty —
+**Alt+Shift is the Windows keyboard-layout switch**, so on a machine with two
+layouts it never reaches the page at all. Nothing defaults to Alt+Shift now.
+The one thing true of every key is a line of text above them;
 what each key *does* is a **?** on its own row, and so is a binding the extension
 can see a problem with — no modifier at all, so the game acts on the key too;
 Alt+Shift, which may never arrive. The symbol turns amber when it has a warning.
-One tooltip used to cover all four keys, which meant each warning had to name the
-binding it was about.
 
 For the game layer the check is live rather than assumed: the extension reads
 the client's own `KeyBinds` table as it is built — defaults and your own
-customised binds alike — and `__cdc.build()` reports whether either key collides
-with a game command. The client does use Alt combinations (Alt+S toggles shroud).
+customised binds alike — and `__cdc.build()` reports whether a binding of yours
+collides with a game command. The client does use Alt combinations (Alt+S
+toggles shroud).
 
 ## Diagnosing it
 
@@ -1141,7 +1144,7 @@ await __cdcHq.survey()                     // the same walk as a stored object, 
 await __cdcHq.render({ tune: { x: 0, y: -15 } })     // nudge every sprite pass
 await __cdcHq.render({ fix: { terrain: { y: 15 } } })       // nudge one sprite type
 await __cdcHq.render({ fixByName: { CAAIRP: { x: 7 } } })   // nudge one object
-await __cdcHq.sample()                     // capture this map for the alignment panel
+await __cdcHq.sample()                     // capture this map split into per-type layers
 __cdcHq.save("bay-of-pigs")                // download the last render
 ```
 

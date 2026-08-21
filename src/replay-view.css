@@ -3,7 +3,7 @@
  *
  * Lifted out of src/options.css on 2026-08-16 together with the renderer, for
  * the same reason: the published site draws the same report and must not carry
- * a second copy of it. `site/build.mjs` vendors this file.
+ * a second copy of it, and vendors this file rather than restyling it.
  *
  * The report carries its own palette rather than inheriting the page's. The two
  * hosts have different vocabularies for the same idea — the extension's `--ink`

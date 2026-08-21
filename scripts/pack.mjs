@@ -23,14 +23,14 @@
  *    a script tag left pointing at a renamed file is silent until the tab is
  *    opened.
  * 3. **Leak sweep** — the shapes that carry a personal machine out of this
- *    repo, the same list `site/build.mjs` sweeps its output for and for the same
+ *    repo, the same list the site build sweeps its output for and for the same
  *    reason. The generated sources here are built from a local game install and
  *    the stored renders are read out of a personal browser profile.
  *
  * The zip is written by hand rather than shelled out to, so that the same input
  * produces the same bytes: entries in sorted order, a fixed timestamp, no
  * directory entries. A rebuilt package that differs is then a real change, which
- * is the property `site/build.mjs` keeps for the same reason.
+ * is the property the site build keeps for the same reason.
  */
 import { deflateRawSync } from "node:zlib";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -121,7 +121,7 @@ function linkSweep(files, read) {
 // --- guard 3: the leak sweep ------------------------------------------------
 
 /**
- * Kept deliberately identical to `site/build.mjs`'s list: the two outputs are
+ * Kept deliberately identical to the site build's list: the two outputs are
  * published from the same machine and the same profile, and a shape worth
  * catching in one is worth catching in the other. The extension id pattern is
  * there because an unpacked load names one and a copied console line carries it.

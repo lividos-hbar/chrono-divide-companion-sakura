@@ -5,7 +5,7 @@
     <title>Companion for Chrono Divide — map guides</title>
     <link rel="stylesheet" href="options.css" />
     <!-- The sprite alignment instrument: a developer surface, dropped from the
-         public build together with its script (see .publish.json). -->
+         public build together with its script. -->
     <!-- The report's own look, in its own file because the published site draws
          the same report from the same two files. -->
     <link rel="stylesheet" href="replay-view.css" />
@@ -177,8 +177,8 @@
             sidebar cameo sends, and nothing else: you still place a building
             yourself. The game has no build hotkeys of its own, so most of these
             will be keys it already uses for something; the extension takes the
-            press first, and the debug panel's <em>build keys</em> row lists
-            which of your bindings override a game command.
+            press first, and <code>__cdc.build()</code> in the game tab's
+            console lists which of your bindings override a game command.
           </p>
           <p class="setlede">
             Bindings are per side, because the sides do not build the same
@@ -588,7 +588,7 @@
               The last few hundred things the extension did, newest at the
               bottom: the game tab's narration of a render run, and every write
               to storage — attempted, then stored or failed. It survives the tab
-              that made it, which the debug HUD in game does not.
+              that made it, which nothing drawn over the game does.
             </span>
           </span>
         </h2>

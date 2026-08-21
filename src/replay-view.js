@@ -10,7 +10,7 @@
  * so the only thing standing between it and the same report was this renderer.
  *
  * Two copies of six hundred lines would have diverged on the first fix, so
- * there is one, and `site/build.mjs` vendors it the way it already vendors
+ * there is one, and the site build vendors it the way it already vendors
  * `src/glyphs.js`.
  *
  * **Write-only, and that is what makes it portable.** Nothing here reads the

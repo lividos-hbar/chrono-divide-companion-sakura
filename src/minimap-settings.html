@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Chrono Divide — Minimap QoL</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin:0; padding:24px; background:#101114; color:#eee; font:14px system-ui,sans-serif; }
+    main { max-width:620px; margin:auto; }
+    h1 { margin:0 0 6px; font-size:22px; }
+    .sub { color:#999; margin:0 0 24px; }
+    section { background:#181a1f; border:1px solid #30333a; border-radius:10px; padding:18px; margin:14px 0; }
+    h2 { font-size:16px; margin:0 0 14px; }
+    .row { display:grid; grid-template-columns:1fr auto; gap:14px; align-items:center; padding:10px 0; border-top:1px solid #292c32; }
+    .row:first-of-type { border-top:0; }
+    .desc { color:#999; font-size:12px; margin-top:3px; }
+    input[type=color] { width:48px; height:32px; padding:2px; border:1px solid #555; background:#111; }
+    input[type=checkbox] { width:18px; height:18px; }
+    button { border:1px solid #555; border-radius:6px; background:#24272d; color:#eee; padding:8px 12px; cursor:pointer; }
+    button:hover { background:#30343b; }
+    .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
+    #status { min-height:20px; color:#8fd18f; margin-top:10px; }
+    .test { display:flex; gap:8px; flex-wrap:wrap; }
+    .swatch { width:110px; height:42px; border-radius:5px; border:1px solid #444; display:flex; align-items:center; justify-content:center; font-size:11px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Minimap QoL</h1>
+  <p class="sub">Local rendering preferences. These do not change the multiplayer game state.</p>
+
+  <section>
+    <h2>Minimap</h2>
+    <div class="row">
+      <div><strong>Enable dark minimap</strong><div class="desc">Replace terrain/shroud colours with high-contrast dark tones.</div></div>
+      <input id="enabled" type="checkbox">
+    </div>
+    <div class="row">
+      <div><strong>Preserve radar / technology colours</strong><div class="desc">Keep the client's special tile colours. Disable this to test the suspected moving-unit “twinkle” source.</div></div>
+      <input id="preserve" type="checkbox">
+    </div>
+  </section>
+
+  <section>
+    <h2>Colours</h2>
+    <div class="row"><div><strong>Normal terrain</strong><div class="desc">Default: #141414</div></div><input id="terrain" type="color"></div>
+    <div class="row"><div><strong>Darkened / shroud</strong><div class="desc">Default: #080808</div></div><input id="darkened" type="color"></div>
+    <div class="row"><div><strong>Unexplored</strong><div class="desc">Default: #000000</div></div><input id="unexplored" type="color"></div>
+    <div class="test" id="preview"></div>
+  </section>
+
+  <section>
+    <h2>Testing</h2>
+    <p class="desc">After changing a setting, reload the game tab. The next version will also apply these changes live while a match is running.</p>
+    <div class="actions">
+      <button id="reset">Reset minimap defaults</button>
+      <button id="fullOptions">Open Companion options</button>
+    </div>
+    <div id="status"></div>
+  </section>
+</main>
+<script src="minimap-settings.js"></script>
+</body>
+</html>

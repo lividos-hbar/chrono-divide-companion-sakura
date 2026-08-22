@@ -84,6 +84,18 @@ Both require page-world access, so the content script is declared
 was read out of its own bundle at v0.83.3, and the module names and call shapes
 are quoted in the source files that use them.
 
+### Player-colour renderer investigation
+
+The extension does not yet alter player colours. In a live game its page-world
+diagnostic can inventory the loaded modules with
+`__cdcPlayerColours.inspect()`. For the actionable follow-up, run
+`__cdcPlayerColours.inspectRenderPath()`: it ranks non-three.js prototype
+methods that mention both player/palette/colour state and a renderer, sprite,
+material, minimap, radar, or remap. The `preview` column is deliberately short;
+run `__cdcPlayerColours.show(id, exportName, method)` with a row's values to
+print that exact method body. These commands only inspect the loaded module
+table and do not patch game prototypes or modify game state.
+
 ## Install (development)
 
 1. `chrome://extensions` → enable **Developer mode**.

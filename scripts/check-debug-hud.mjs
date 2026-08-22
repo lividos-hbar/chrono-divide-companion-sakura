@@ -215,6 +215,46 @@ check(
   !options.includes("press the debug hotkey")
 );
 
+// --- and what the keyboard must not keep --------------------------------------
+//
+// The row the options page skips has to leave the *table* as well. It did not,
+// and the cost was the whole point of hiding it: `debug` is tested first in the
+// keydown chain, so in the public build a `6` the user had rebound to the
+// preview swap was swallowed by a binding they could neither see nor change,
+// and handed to the inert toggle above it. A hidden control that still wins the
+// press is worse than a visible one.
+
+const own = /  function ownKeys\(table\) \{[\s\S]*?\n  \}/.exec(companion);
+check("the key table is filtered by what this build ships", !!own);
+if (own) {
+  const make = new Function("window", `${own[0]}\nreturn ownKeys;`);
+  const table = { overlay: { code: "Digit1" }, hqSwap: { code: "Digit6" }, debug: { code: "Digit6" } };
+  const withPanel = make({ __cdcHud: {} })(table);
+  const without = make({})(table);
+  check(
+    "with the panel, every key stays",
+    Object.keys(withPanel).sort().join(" ") === "debug hqSwap overlay",
+    Object.keys(withPanel).sort().join(" ")
+  );
+  check("without it, the debug binding is gone", without.debug === undefined && !!without.hqSwap);
+  check(
+    "and the table handed in is not mutated — the options write filters a spread of it, not a copy",
+    table.debug !== undefined
+  );
+}
+check(
+  "the initial table goes through the filter",
+  /keys: ownKeys\(JSON\.parse\(JSON\.stringify\(DEFAULT_KEYS\)\)\)/.test(companion)
+);
+check(
+  "and so does the options page's write, which would otherwise put it straight back",
+  /state\.keys = ownKeys\(\{ \.\.\.state\.keys, \.\.\.data\.keys \}\);/.test(companion)
+);
+check(
+  "a descriptor that is not there answers false rather than throwing on `.code`",
+  /function matchesHotkey\(e, key\) \{[\s\S]*?if \(!key\) return false;/.test(companion)
+);
+
 // ------------------------------------------------------------------------------
 
 for (const line of results) console.log(line);

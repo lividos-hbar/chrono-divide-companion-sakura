@@ -197,6 +197,27 @@
     net: { code: "Digit7", keyCode: 55, alt: false, shift: false, ctrl: false, label: "7" },
   };
 
+  /**
+   * The key table this build has surfaces for.
+   *
+   * A key whose surface is withheld is not a binding, and leaving it in the
+   * table is not harmless: it is tested before every other key below, so it
+   * swallows the press and hands it to an inert toggle. The options page has
+   * had the rule since 0.79.0 — `hasDebugPanel()` reads the manifest and skips
+   * the row — which is exactly what hid this: in the public build the debug
+   * binding cannot be seen, cannot be changed, and still won `6` from a user
+   * who had bound `6` to the preview swap.
+   *
+   * Filtered here rather than at the press, so `hotkeyConflicts` and
+   * `__cdc.build()` stop reporting a key this build does not have either.
+   */
+  function ownKeys(table) {
+    if (window.__cdcHud) return table;
+    const rest = { ...table };
+    delete rest.debug;
+    return rest;
+  }
+
   // KeyBinds#getHotKeyCode: meta<<12 + alt<<10 + ctrl<<9 + shift<<8 + keyCode.
   const MODIFIER_BITS = { alt: 1024, ctrl: 512, shift: 256 };
 
@@ -406,7 +427,7 @@
     guides: {},
     bridge: "no answer yet", // isolated-world half; "connected" once it replies
     catalogue: null, // how many maps the bridge has stored
-    keys: JSON.parse(JSON.stringify(DEFAULT_KEYS)), // overridden from the options page
+    keys: ownKeys(JSON.parse(JSON.stringify(DEFAULT_KEYS))), // overridden from the options page
     // Our own render of the map in play: { key, thumb, full } — made here by
     // renderHq, or fetched back out of storage by wantStoredRender.
     hq: null,
@@ -2561,7 +2582,7 @@
     if (typeof data.count === "number") state.catalogue = data.count;
 
     if (data.keys) {
-      state.keys = { ...state.keys, ...data.keys };
+      state.keys = ownKeys({ ...state.keys, ...data.keys });
       renderHud();
     }
 
@@ -3156,6 +3177,9 @@
   }
 
   function matchesHotkey(e, key) {
+    // A build with no surface for a key has no descriptor for it (`ownKeys`),
+    // and the press then belongs to whatever is bound underneath.
+    if (!key) return false;
     return (
       e.code === key.code &&
       e.altKey === !!key.alt &&

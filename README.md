@@ -86,15 +86,15 @@ are quoted in the source files that use them.
 
 ### Player-colour renderer investigation
 
-The extension does not yet alter player colours. In a live game its page-world
-diagnostic can inventory the loaded modules with
-`__cdcPlayerColours.inspect()`. For the actionable follow-up, run
-`__cdcPlayerColours.inspectRenderPath()`: it ranks non-three.js prototype
-methods that mention both player/palette/colour state and a renderer, sprite,
-material, minimap, radar, or remap. The `preview` column is deliberately short;
-run `__cdcPlayerColours.show(id, exportName, method)` with a row's values to
-print that exact method body. These commands only inspect the loaded module
-table and do not patch game prototypes or modify game state.
+The extension does not yet alter player colours. In a live game, run the single
+command `__cdcPlayerColours.inspect()`. It prints a compact, copyable table
+with one row per prototype method from the palette, minimap model/renderer,
+SHP builders/materials, and the unit renderables. This replaces the old broad
+inventory whose useful method names were collapsed into `Array(n)` in DevTools.
+If a row needs a deeper look, run
+`__cdcPlayerColours.show(id, exportName, method)` with that row's values to
+print its complete body. These commands only inspect the loaded module table
+and do not patch game prototypes or modify game state.
 
 ## Install (development)
 

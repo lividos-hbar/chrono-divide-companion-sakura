@@ -13,10 +13,13 @@ const gameScripts = manifest.content_scripts
 
 const required = [
   "function inspect()",
-  "function inspectRenderPath()",
+  "const inspectRenderPath = inspect",
   "function show(id, exportName, method)",
   "window.__cdcPlayerColours = { inspect, inspectRenderPath, moduleTable, show }",
-  "if (id.includes(\"/three\")) continue",
+  "const TARGETS = [",
+  "engine/renderable/entity/map/MinimapModel",
+  "engine/renderable/entity/map/MinimapRenderer",
+  "engine/renderable/builder/ShpBuilder",
 ];
 
 const missing = required.filter((needle) => !diagnostic.includes(needle));
@@ -28,4 +31,4 @@ if (missing.length || !gameScripts.includes("src/player-colours.js")) {
   process.exit(1);
 }
 
-console.log("PASS player-colours diagnostic contract — ranked inspection and source display available");
+console.log("PASS player-colours diagnostic contract — focused inspection and source display available");

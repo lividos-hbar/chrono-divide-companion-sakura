@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Companion for Chrono Divide",
-  "version": "0.96.1",
+  "version": "0.96.2",
   "description": "Faction labels, per-map hints, a map preview, build hotkeys, settings backup and replay build orders for Chrono Divide.",
   "minimum_chrome_version": "111",
   "icons": {
@@ -19,6 +19,7 @@
   ],
   "action": {
     "default_title": "Companion for Chrono Divide — map guides and hotkeys",
+    "default_popup": "src/minimap-settings.html",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",

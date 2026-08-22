@@ -1,31 +1,33 @@
-/**
- * Minimap QoL
- *
- * Darkens terrain/shroud so unit and radar colours are easier to read while
- * preserving tiles that the client has already marked with a useful radar
- * colour. This is a local rendering change only; it does not alter map state,
- * shroud state, or multiplayer simulation state.
- *
- * The hook mirrors the currently working client-side MinimapModel patch supplied
- * by El Presidente. It is deliberately isolated so the feature can be removed
- * or extended without touching the rest of the companion.
- */
 (() => {
   "use strict";
 
   const TAG = "[cd-companion/minimap-qol]";
   const DEFAULTS = {
+    enabled: true,
+    preserveRadarColors: true,
     unexplored: "#000000",
     darkened: "#080808",
     terrain: "#141414",
   };
 
-  const state = {
-    enabled: true,
-    colors: { ...DEFAULTS },
-    installed: false,
-    rendererPatched: false,
-  };
+  const state = { ...DEFAULTS, installed: false, rendererPatched: false };
+
+  function applyPrefs(prefs = {}) {
+    if (typeof prefs.minimapEnabled === "boolean") state.enabled = prefs.minimapEnabled;
+    if (typeof prefs.minimapPreserveRadarColors === "boolean") {
+      state.preserveRadarColors = prefs.minimapPreserveRadarColors;
+    }
+    if (typeof prefs.minimapUnexplored === "string") state.unexplored = prefs.minimapUnexplored;
+    if (typeof prefs.minimapDarkened === "string") state.darkened = prefs.minimapDarkened;
+    if (typeof prefs.minimapTerrain === "string") state.terrain = prefs.minimapTerrain;
+  }
+
+  window.addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || data.source !== "cdc-bridge" || data.type !== "config") return;
+    applyPrefs(data.prefs);
+    if (window.__cdcMinimapQol?.refresh) window.__cdcMinimapQol.refresh();
+  });
 
   const install = async () => {
     if (state.installed) return true;
@@ -47,36 +49,33 @@
         return false;
       }
 
-      const originalGetTileColor = Model.prototype.getTileColor;
-
-      // Do not install twice if the script is re-evaluated.
       if (Model.prototype.__cdcMinimapQol) {
         state.installed = true;
         return true;
       }
 
+      const originalGetTileColor = Model.prototype.getTileColor;
+
       Model.prototype.getTileColor = function (tile) {
         const index = tile.rx + tile.ry * this.stride;
         const original = originalGetTileColor.call(this, tile);
-
         if (!state.enabled) return original;
 
-        // Preserve the colour used by the game's radar/technology rendering.
-        const hasRadarColour =
-          this.tileWithTechnos?.[index] &&
-          this.tileColors?.[index] !== this.tiles.getTileRadarColor(tile).getHex();
-
-        if (hasRadarColour) return original;
-
-        if (this.shroud?.getShroudType(tile) === ShroudType.Unexplored) {
-          return state.colors.unexplored;
+        // This is the likely source of the observed "twinkle": a moving unit
+        // changes tileWithTechnos/tileColors, causing a tile to alternate between
+        // the original terrain colour and our dark colour. The setting lets us
+        // deliberately remove that dependency and test whether the renderer's
+        // separate unit layer is sufficient to keep unit colours visible.
+        if (state.preserveRadarColors) {
+          const hasRadarColour =
+            this.tileWithTechnos?.[index] &&
+            this.tileColors?.[index] !== this.tiles.getTileRadarColor(tile).getHex();
+          if (hasRadarColour) return original;
         }
 
-        if (this.shroud?.isFlagged(tile, ShroudFlag.Darken)) {
-          return state.colors.darkened;
-        }
-
-        return state.colors.terrain;
+        if (this.shroud?.getShroudType(tile) === ShroudType.Unexplored) return state.unexplored;
+        if (this.shroud?.isFlagged(tile, ShroudFlag.Darken)) return state.darkened;
+        return state.terrain;
       };
 
       Object.defineProperty(Model.prototype, "__cdcMinimapQol", {
@@ -88,7 +87,6 @@
       if (Renderer?.prototype?.renderIncremental && Renderer.prototype.renderFull) {
         const originalIncremental = Renderer.prototype.renderIncremental;
         let firstRender = true;
-
         Renderer.prototype.renderIncremental = function (tile) {
           if (firstRender) {
             firstRender = false;
@@ -100,7 +98,7 @@
       }
 
       state.installed = true;
-      console.info(TAG, "installed", state.colors);
+      console.info(TAG, "installed", { ...state });
       return true;
     } catch (error) {
       console.warn(TAG, "failed to install", error);
@@ -108,34 +106,27 @@
     }
   };
 
-  // Expose a tiny local API so we can experiment from DevTools before wiring
-  // these settings into the companion options page.
   window.__cdcMinimapQol = {
     install,
-    getState: () => ({
-      enabled: state.enabled,
-      colors: { ...state.colors },
-      installed: state.installed,
-      rendererPatched: state.rendererPatched,
-    }),
-    setEnabled(enabled) {
-      state.enabled = !!enabled;
+    refresh() {
+      // getTileColor is evaluated by the normal incremental renderer. A full
+      // redraw is deliberately not forced on every settings change because
+      // doing so can itself create visible flicker while a unit is moving.
+      console.info(TAG, "settings updated", { ...state });
     },
+    getState: () => ({ ...state }),
+    setEnabled(enabled) { state.enabled = !!enabled; },
+    setPreserveRadarColors(enabled) { state.preserveRadarColors = !!enabled; },
     setColors(colors = {}) {
-      state.colors = {
-        ...state.colors,
-        ...Object.fromEntries(
-          Object.entries(colors).filter(([key, value]) => key in DEFAULTS && typeof value === "string")
-        ),
-      };
+      for (const key of ["unexplored", "darkened", "terrain"]) {
+        if (typeof colors[key] === "string") state[key] = colors[key];
+      }
     },
-    resetColors() {
-      state.colors = { ...DEFAULTS };
+    reset() {
+      Object.assign(state, DEFAULTS);
     },
   };
 
-  // SystemJS is available during normal client runtime; retry briefly if the
-  // extension script happened to run before the client exposed it.
   const boot = () => {
     if (window.SystemJS?.import) {
       install();

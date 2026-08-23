@@ -7,7 +7,12 @@
     minimapTerrain: "#141414",
     minimapDarkened: "#080808",
     minimapUnexplored: "#000000",
+    playerColoursEnabled: false,
+    playerColoursMatchMode: "1v1",
+    playerColoursEnemyMode: "same",
+    playerColoursOrder: ["DarkRed", "DarkBlue"],
   };
+  const PLAYER_COLOURS = ["Gold", "DarkRed", "DarkBlue", "DarkGreen", "Orange", "DarkSky", "Purple", "Magenta"];
 
   const $ = (id) => document.getElementById(id);
   const controls = {
@@ -16,7 +21,18 @@
     terrain: $("terrain"),
     darkened: $("darkened"),
     unexplored: $("unexplored"),
+    playerColoursEnabled: $("playerColoursEnabled"),
+    playerColoursMatchMode: $("playerColoursMatchMode"),
+    playerColoursEnemyMode: $("playerColoursEnemyMode"),
+    playerColoursFirst: $("playerColoursFirst"),
+    playerColoursSecond: $("playerColoursSecond"),
   };
+
+  function fillColourSelects() {
+    for (const control of [controls.playerColoursFirst, controls.playerColoursSecond]) {
+      control.replaceChildren(...PLAYER_COLOURS.map((name) => new Option(name, name)));
+    }
+  }
 
   function load() {
     chrome.storage.local.get({ prefs: {} }, ({ prefs }) => {
@@ -26,6 +42,11 @@
       controls.terrain.value = p.minimapTerrain;
       controls.darkened.value = p.minimapDarkened;
       controls.unexplored.value = p.minimapUnexplored;
+      controls.playerColoursEnabled.checked = !!p.playerColoursEnabled;
+      controls.playerColoursMatchMode.value = p.playerColoursMatchMode;
+      controls.playerColoursEnemyMode.value = p.playerColoursEnemyMode;
+      controls.playerColoursFirst.value = p.playerColoursOrder[0];
+      controls.playerColoursSecond.value = p.playerColoursOrder[1] || p.playerColoursOrder[0];
       renderPreview();
     });
   }
@@ -39,6 +60,10 @@
         minimapTerrain: controls.terrain.value,
         minimapDarkened: controls.darkened.value,
         minimapUnexplored: controls.unexplored.value,
+        playerColoursEnabled: controls.playerColoursEnabled.checked,
+        playerColoursMatchMode: controls.playerColoursMatchMode.value,
+        playerColoursEnemyMode: controls.playerColoursEnemyMode.value,
+        playerColoursOrder: [controls.playerColoursFirst.value, controls.playerColoursSecond.value],
       };
       chrome.storage.local.set({ prefs: next }, () => {
         $("status").textContent = "Saved. Reload the game tab to test it.";
@@ -61,8 +86,14 @@
     controls.terrain.value = DEFAULTS.minimapTerrain;
     controls.darkened.value = DEFAULTS.minimapDarkened;
     controls.unexplored.value = DEFAULTS.minimapUnexplored;
+    controls.playerColoursEnabled.checked = DEFAULTS.playerColoursEnabled;
+    controls.playerColoursMatchMode.value = DEFAULTS.playerColoursMatchMode;
+    controls.playerColoursEnemyMode.value = DEFAULTS.playerColoursEnemyMode;
+    controls.playerColoursFirst.value = DEFAULTS.playerColoursOrder[0];
+    controls.playerColoursSecond.value = DEFAULTS.playerColoursOrder[1];
     save();
   });
   $("fullOptions").addEventListener("click", () => chrome.runtime.openOptionsPage());
+  fillColourSelects();
   load();
 })();

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Chrono Divide — Minimap QoL</title>
+  <title>Chrono Divide — Display settings</title>
   <style>
     :root { color-scheme: dark; }
     body { margin:0; padding:24px; background:#101114; color:#eee; font:14px system-ui,sans-serif; }
@@ -27,7 +27,7 @@
 </head>
 <body>
 <main>
-  <h1>Minimap QoL</h1>
+  <h1>Display settings</h1>
   <p class="sub">Local rendering preferences. These do not change the multiplayer game state.</p>
 
   <section>
@@ -43,6 +43,30 @@
   </section>
 
   <section>
+    <h2>Enemy player colours</h2>
+    <div class="row">
+      <div><strong>Recolour enemies locally</strong><div class="desc">Changes only display colours, using colours the game has already prepared.</div></div>
+      <input id="playerColoursEnabled" type="checkbox">
+    </div>
+    <div class="row">
+      <div><strong>Apply in</strong><div class="desc">Avoids changing FFA, uneven-team, observer, and replay displays.</div></div>
+      <select id="playerColoursMatchMode"><option value="1v1">1v1 only</option><option value="2v2">1v1 and 2v2</option></select>
+    </div>
+    <div class="row">
+      <div><strong>In 2v2</strong><div class="desc">Use one enemy colour, or keep the two enemies distinct.</div></div>
+      <select id="playerColoursEnemyMode"><option value="same">Same colour</option><option value="different">Different colours</option></select>
+    </div>
+    <div class="row">
+      <div><strong>First enemy colour</strong><div class="desc">Used for the opponent in 1v1 and first opponent in 2v2.</div></div>
+      <select id="playerColoursFirst"></select>
+    </div>
+    <div class="row">
+      <div><strong>Second enemy colour</strong><div class="desc">Used only when 2v2 is set to different colours.</div></div>
+      <select id="playerColoursSecond"></select>
+    </div>
+  </section>
+
+  <section>
     <h2>Colours</h2>
     <div class="row"><div><strong>Normal terrain</strong><div class="desc">Default: #141414</div></div><input id="terrain" type="color"></div>
     <div class="row"><div><strong>Darkened / shroud</strong><div class="desc">Default: #080808</div></div><input id="darkened" type="color"></div>
@@ -52,9 +76,9 @@
 
   <section>
     <h2>Testing</h2>
-    <p class="desc">After changing a setting, reload the game tab. The next version will also apply these changes live while a match is running.</p>
+      <p class="desc">Reload the game tab after changing settings. Enable player colours before a match so radar blips are coloured from their first update.</p>
     <div class="actions">
-      <button id="reset">Reset minimap defaults</button>
+      <button id="reset">Reset display defaults</button>
       <button id="fullOptions">Open Companion options</button>
     </div>
     <div id="status"></div>

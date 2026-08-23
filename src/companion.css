@@ -975,3 +975,23 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A short page when the server has finished putting the player in a channel.
+   It is deliberately independent of the client's chat markup: that markup is
+   a React implementation detail, whereas a page needs to remain visible while
+   a welcome message is still being painted. */
+.cdc-lobby-page {
+  position: fixed;
+  z-index: 2147483647;
+  top: 4.25rem;
+  left: 50%;
+  max-width: calc(100vw - 2rem);
+  padding: 0.65rem 1rem;
+  transform: translateX(-50%);
+  border: 1px solid #e4c65d;
+  border-radius: 3px;
+  background: #25201aef;
+  box-shadow: 0 3px 14px #000b;
+  color: #ffe99a;
+  font: 600 14px/1.25 system-ui, sans-serif;
+  pointer-events: none;
+}

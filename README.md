@@ -88,6 +88,28 @@ Both require page-world access, so the content script is declared
 was read out of its own bundle at v0.83.3, and the module names and call shapes
 are quoted in the source files that use them.
 
+### Player-colour renderer investigation
+
+The extension does not yet alter player colours. In a live game, run the single
+command `__cdcPlayerColours.inspect()`. It prints a compact, copyable table
+with one row per prototype method from the palette, minimap model/renderer,
+SHP builders/materials, and the unit renderables. This replaces the old broad
+inventory whose useful method names were collapsed into `Array(n)` in DevTools.
+If a row needs a deeper look, run
+`__cdcPlayerColours.show(id, exportName, method)` with that row's values to
+print its complete body. These commands only inspect the loaded module table
+and do not patch game prototypes or modify game state.
+
+For an opt-in local display override, run
+`__cdcPlayerColours.setEnemyColor("DarkRed")` before starting a match (or while
+one is running). The value must be the name of a colour in `game.rules.colors`;
+the client precomputes batched voxel palettes only for those colours, so passing
+a newly-created RGB colour is deliberately unsupported. `setEnabled(false)`
+restores the players' original local colour objects. It does not send an action
+or alter the lockstep state. Enable it before match start for an immediately
+consistent minimap; changing it mid-match can leave existing radar blips at
+their previous colour until the relevant units or structures next dirty a tile.
+
 ## Install (development)
 
 1. `chrome://extensions` → enable **Developer mode**.

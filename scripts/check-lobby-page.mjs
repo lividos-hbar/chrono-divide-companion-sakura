@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const companion = readFileSync(join(here, "..", "src", "companion.js"), "utf8");
-const css = readFileSync(join(here, "..", "src", "companion.css"), "utf8");
+const frames = readFileSync(join(here, "..", "src", "frames.js"), "utf8");
 const checks = [];
 
 function check(name, ok, detail = "") {
@@ -31,7 +31,7 @@ check(
 );
 check(
   "the page is delivered once and then its observer is released",
-  /lobbyPageDelivered = true;\s*if \(lobbyPageWatch\) lobbyPageWatch\.disconnect\(\);/.test(companion)
+  /if \(typeof window\.__cdcPage !== "function" \|\| !window\.__cdcPage\(text\)\) \{[\s\S]*?return false;[\s\S]*?lobbyPageDelivered = true;\s*if \(lobbyPageWatch\) lobbyPageWatch\.disconnect\(\);/.test(companion)
 );
 check(
   "both a ready bridge and a late chat render can trigger the check",
@@ -39,13 +39,14 @@ check(
     /watchForLobbyPage\(\);\s*\}\)\(\);/.test(companion)
 );
 check(
-  "the visual uses an accessible status role and clears itself",
-  /page\.setAttribute\("role", "status"\);/.test(companion) &&
-    /setTimeout\(\(\) => page\.remove\(\), 9000\);/.test(companion)
+  "the page is replayed through the client message event rather than a custom DOM banner",
+  /socket\.dispatchEvent\(new MessageEvent\("message", \{ data \}\)\);/.test(frames) &&
+    /cdc-lobby-page/.test(companion) === false
 );
 check(
-  "the page is above the lobby but cannot intercept its controls",
-  /\.cdc-lobby-page\s*\{[\s\S]*?z-index:\s*2147483647;[\s\S]*?pointer-events:\s*none;/.test(css)
+  "the page preserves the real channel-join packet as its protocol template",
+  /const JOIN_LINE = \/You joined channel/.test(frames) &&
+    /pageTemplate = \{ socket, data: event\.data \};/.test(frames)
 );
 
 for (const { name, ok, detail } of checks) {

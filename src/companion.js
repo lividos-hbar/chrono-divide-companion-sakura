@@ -7825,10 +7825,11 @@
   }
 
   /**
-   * Put the same sort of short, out-of-band notice the client uses for an idle
-   * page above the lobby.  A console line is useful while developing, but it
-   * leaves a player who has just joined a channel with no indication that the
-   * extension which supplies their lobby and match helpers is actually live.
+   * Put the load notice through the client's own XWOL page path.  frames.js
+   * retains the real channel-join packet before the client parses it, so this
+   * call replays a protocol-correct page rather than building a lookalike DOM
+   * banner.  The chat client therefore gives it the same sender, placement and
+   * lifetime as its `(xwol-*) You are away` pages.
    *
    * The welcome text is supplied by the server, so it is a better boundary than
    * a route or a client class name: it is present for every realm and only after
@@ -7847,18 +7848,16 @@
 
   function showLobbyPage() {
     if (lobbyPageDelivered || VERSION === "?" || !lobbyJoinedChannel()) return false;
+
+    const text = `(CD-Companion) Successfully loaded version ${VERSION}`;
+    if (typeof window.__cdcPage !== "function" || !window.__cdcPage(text)) {
+      // The join line can reach React before the WebSocket observer receives it
+      // only on a client that changed its transport; keep watching in that case.
+      return false;
+    }
     lobbyPageDelivered = true;
     if (lobbyPageWatch) lobbyPageWatch.disconnect();
-
-    const page = document.createElement("div");
-    page.className = "cdc-lobby-page";
-    page.setAttribute("role", "status");
-    page.textContent = `(CD-Companion) Successfully loaded version ${VERSION}`;
-    document.body.append(page);
-    // A page is deliberately transient: it confirms the load without becoming
-    // another line in the player's channel history or covering the lobby.
-    setTimeout(() => page.remove(), 9000);
-    note(`lobby page delivered — ${page.textContent}`);
+    note(`lobby page delivered — ${text}`);
     return true;
   }
 

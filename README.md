@@ -39,6 +39,10 @@ A Chromium (Chrome/Edge) MV3 extension that adds pre-game information to the
   pause. The overlay now keeps its own copy of what it has ordered, so the keys and the tiles both see
   the queue as it will be. One press is still one action.
 
+- **Player colours** — who is painted what, whatever they picked in the lobby: you, your
+  allies, and each opponent in turn. The game repaints itself — units, buildings, radar
+  blips, health bars — and nothing is sent to anyone else.
+
 - **Settings backup** — the game keeps its hotkeys in a file inside the
   browser's own private storage and its other options in that browser's
   localStorage, so a second browser starts blank and there is nothing on disk to
@@ -146,7 +150,7 @@ factions still read fine without them.
 
 The client's own `KeyCommandType` has no build command — the sidebar is mouse
 only — so a key that queues something is the one thing here the game cannot
-already do. Bind them under **Overlay settings** → *Build hotkeys*: pick an
+already do. Bind them under **Settings** → *Build hotkeys*: pick an
 object, press a combination, and in a match that key queues one of it. Placement
 is untouched; a building still waits for you to click a tile.
 
@@ -263,7 +267,7 @@ anyway; a units grid stays open so the next order is one key. And when the
 building on a grid you are watching **finishes**, the tab key that opened it
 places it, rather than ordering the slot it sits on — the rule below.
 
-**One press, if you would rather.** *Overlay settings* → *Build chords* has a
+**One press, if you would rather.** *Settings* → *Build chords* has a
 tick that opens the grid on the first press instead of the second. Nothing else
 changes: the press still reaches the client, the tab still switches, and the grid
 is simply in the way of the next key — which is the point of it, and why the
@@ -721,7 +725,7 @@ straight out of the running client — a superweapon is not an object, so its
 picture is not in the extension's generated cameo sheet and cannot be. A client
 that cannot answer leaves the building's cameo in place.
 
-*Overlay settings* → *Build chords* has a tick to turn them off.
+*Settings* → *Build chords* has a tick to turn them off.
 
 ## The production panel
 
@@ -758,8 +762,13 @@ one, and that is the one silent case, so it is listed by name.
 
 The list of bindable objects is read from **the client's own rules**, in the game
 tab, and kept in storage for the options page (which has no game and therefore no
-rules of its own). It is harvested once per client version; open the game once
-with the extension installed and the picker fills in. The names, costs and
+rules of its own). It is harvested once per client version; **play one match**
+with the extension installed and the picker fills in. A match rather than an
+open client: the client parses its rules during its own boot, long before the
+main menu, but the harvest that reads them is fired at idle from a config push
+that regularly arrives while the splash screen is still up — so match start is
+the attempt that reliably lands, and the same holds for the colour table and the
+object table. The names, costs and
 pictures come off the same trip: the object table and the cameo sheet the replay
 views already read, harvested from that client and never shipped in this repo.
 
@@ -849,6 +858,62 @@ grows one entry per turn), the age label, which ping interval is asked for in
 each of the three states, and that detaching a finished match releases all five
 subscriptions.
 
+## Player colours
+
+**Options page → Settings → Player colours.** Off by default. Ticked, it
+paints a match by **role** rather than by lobby slot: one colour for you, one for
+your allies, and an **ordered list for opponents** — the first opponent takes the
+first, the second takes the second. Any row left on *as picked* changes nothing,
+so forcing one role and leaving the rest alone is a first-class answer.
+
+The ordering is what makes this more than "every enemy is red": all-enemies-one-
+colour merges two opponents into one side in 2v2 and free-for-all. A **blank row
+holds its place** — leaving the first opponent as picked and setting the second
+still paints the *second* opponent, rather than promoting everyone up by one, so
+a row means the same opponent whatever the rows above it say.
+
+Three surfaces follow the setting: the match itself, the roster on our
+loading-screen panel and the `1` overlay, and the client's own loading-screen
+rows. On the loading screen there are no players yet, only the lobby's slots, so
+**allies there are the lobby's teams** rather than a live alliance — and if two
+people picked the same country, "you" is ambiguous and that screen is left in the
+client's colours rather than painted from a guess. The match itself has no such
+doubt.
+
+### The game repaints itself
+
+The whole feature is one assignment: `player.color = rules.colors.get(name)`.
+Every renderable the client builds re-reads its owner's colour on each update and
+re-remaps its palette when it differs — the path that exists so a mind-controlled
+tank turns Yuri's colour — so one write repaints that player's army, their radar
+blips, their health bars and their control-group tags. **Nothing here draws
+anything.**
+
+It is applied from `Game#init`, which is the first moment every player's role
+exists (the client forms the lobby's teams into alliances at the end of it) and
+the last before anything has been drawn in the wrong colour. An alliance formed
+or broken mid-match repaints too; the radar takes a tile's colour when the tile
+is dirtied rather than every frame, so blips already on it keep the old colour
+until each object next moves.
+
+**A colour is only ever taken by name out of the client's own rules.** With
+sprite batching on, a batched voxel builder resolves its palette by content hash
+against a list precomputed from `rules.colors`, and throws *inside the render
+loop* when the hash misses — so an invented red is a crash rather than a red.
+That is why the options page offers a table harvested from the client — the same
+trip that reads the build roster, and it fills in when you **play a match**, not
+when you open the client — instead of colours of its own, and why a name
+this client does not define is skipped with a line in the log rather than
+guessed at. `node scripts/check-colours.mjs` asserts the section never
+constructs a colour, along with the ordinals, the observer and empty-table
+cases, and that the alliance watch is released with the match it belongs to.
+
+**It is local render state and nothing else.** Colour is absent from
+`Player#getHash()`, which is what the lockstep compares, and nothing sends it: no
+desync, nothing on the wire, and no information a client did not already hold —
+every client knows every alliance already, because the action that forms one
+travels through the same lockstep everyone replays.
+
 ## Per-map guides
 
 The extension's **options page** — click the extension's toolbar icon, or
@@ -859,7 +924,7 @@ The extension's **options page** — click the extension's toolbar icon, or
 | **Ladder 1x1** | the 1v1 ranked pool, and the guides of the maps it plays |
 | **Ladder 2x2** | the same instrument pointed at the 2v2 pool, which is a different set of maps |
 | **Stored maps** | everything this machine is holding, whatever ladder it belongs to — a ladder tab lists that pool's maps and nothing else |
-| **Overlay settings** | the hotkeys, and everything the extension draws over the game |
+| **Settings** | everything the extension has of its own — the hotkeys it takes, the keys that build, and everything it draws over the game |
 | **Backup** | your bindings, plus the game's own hotkeys and options — which it keeps where you cannot copy them — into a single file |
 | **Log** | what the extension did, kept in storage so it outlives the tab that did it |
 | **Replays** | a ladder replay's build orders, read out of the file |
@@ -934,7 +999,7 @@ size in the same pixel space as this overlay. **Drag** the preview to move it,
 drag its bottom-right corner to resize; the position is remembered per browser.
 `__cdc.resetLayout()` puts it back on the radar.
 
-**Every one of these keys is reassignable** under **Overlay settings** in the
+**Every one of these keys is reassignable** under **Settings** in the
 options page — click the key, press the combination. That matters because a
 hotkey can be taken by three layers and only you can see all three: the game,
 the browser, and Windows. An Alt+Shift binding was the first casualty —
@@ -1012,7 +1077,7 @@ The render is made **automatically, once per map**, right after a match finishes
 loading — that is the first moment the theater art exists — and stored. Every
 place that shows it reads from that store; none can produce one, so a map you
 have never played has no render. *Render a map the first time it is played*,
-under **Overlay settings**, is what turns that off; a render is then only made
+under **Settings**, is what turns that off; a render is then only made
 by *Render ticked* on a ladder tab or a card's own *Re-render*.
 
 **Both preview slots show it** — the loading screen and the in-game overlay —
@@ -1046,7 +1111,7 @@ In game:
 Which picture is shown is decided in three places, and they do not all mean the
 same thing:
 
-- **Use the map's own preview**, under **Overlay settings** → *Options*, is the answer for
+- **Use the map's own preview**, under **Settings** → *Overlay options*, is the answer for
   the two in-game slots — the loading-screen panel and the overlay. It is off, so
   in game the default is our render wherever there is one.
 - **Show the map's own preview on cards**, in a ladder tab's list bar, is the
@@ -1157,7 +1222,7 @@ On top of the art it draws what a player actually reads a map for:
 | solid block of cells | a start position, sized to the Construction Yard that will stand there, numbered |
 | green outline | a capturable building standing unowned |
 | player-coloured outline, and the building painted that colour | a building the map hands to a player at match start |
-| a pictogram floating above it | what taking it gets you — the same glyphs the thumbnail uses, riding above the footprint rather than on it, so the outline still says which ground it stands on and the art stays visible. **Drawn over the picture, not into it**, so *Mark tech buildings on the full render* (in game, under **Overlay settings**) and *Mark tech buildings in the viewer* (this page, in a ladder tab's list bar) turn them off on renders you already have, with nothing to re-render |
+| a pictogram floating above it | what taking it gets you — the same glyphs the thumbnail uses, riding above the footprint rather than on it, so the outline still says which ground it stands on and the art stays visible. **Drawn over the picture, not into it**, so *Mark tech buildings on the full render* (in game, under **Settings**) and *Mark tech buildings in the viewer* (this page, in a ladder tab's list bar) turn them off on renders you already have, with nothing to re-render |
 
 Outlined: **buildings you can take, and buildings a trigger hands to a player
 before the match starts** — ordinary civilian scenery is left alone. Ownership
@@ -2077,7 +2142,7 @@ everything can be loaded for its hotkeys alone.
 - **Other game options** — the `_r_*` settings the client's own options screens
   write, including the sound mixer and your preferred host options.
 - **Extension bindings** — the number keys, the build hotkeys per side, the
-  chord grids, and the tick boxes on *Overlay settings*.
+  chord grids, and the tick boxes on *Settings*.
 - **Map guides** — the per-map guides, which preview each map shows, and the
   start-position marks turned off. Not the sprite offsets: those are a
   measurement rather than a preference, and the table in `src/hq-preview.js`

@@ -188,6 +188,11 @@
     // rather than assumed (2026-08-21): `BuildCat.Combat` is 0 — falsy, which
     // is exactly how a truthiness test on it would look right and be wrong.
     technoRules: "game/rules/TechnoRules",
+    // The eight colours a lobby offers, as the client's own list rather than
+    // ours. `colours` below returns every colour in the rules — the whole
+    // `[Colors]` section, because that is the set a palette remap is legal for
+    // — and this is what says which of them a player could have picked.
+    mpColors: "game/rules/mpAllowedColors",
   };
 
   // TMP blocks are 60×30 for RA2; each tmp file states its own, and only the
@@ -508,6 +513,7 @@
       ImageUtils: m.imageUtils.ImageUtils,
       BridgeOverlayTypes: m.bridgeTypes.BridgeOverlayTypes,
       Color: m.color.Color,
+      mpAllowedColors: m.mpColors.mpAllowedColors,
       BuildCat: m.technoRules.BuildCat,
       FactoryType: m.technoRules.FactoryType,
     };
@@ -2080,6 +2086,41 @@
   }
 
   /**
+   * Every colour the rules define, by name, with the hex the client would draw
+   * it in — and which of them a lobby offers.
+   *
+   * This is the table the recolour option picks from, and it is harvested for
+   * the same reason `roster` is: the client layers `rulescd.ini` over
+   * `rules.ini`, so a hex written down here would be our guess at a number the
+   * client already knows, and would go stale the day Chrono Divide retunes a
+   * colour. `rulesOnly` is already loaded, so it costs one more walk of a Map.
+   *
+   * **The whole `[Colors]` section, not just the eight.** A remap is legal for
+   * any colour in it — the renderable precomputes one palette per entry of
+   * `rules.colors` and looks the live one up by content hash — while
+   * `mpAllowedColors` is only the subset a lobby lets a player choose. Offering
+   * the wider set is what makes "recolour" mean more than "swap two lobby
+   * picks", and `mp` is returned beside it so the options page can put the
+   * familiar eight first.
+   *
+   * @returns {Promise<{ mp: string[], colors: Record<string, string> }>}
+   */
+  async function colours() {
+    const { rules, mpAllowedColors } = await rulesOnly();
+    const colors = {};
+    for (const [name, colour] of rules.colors) {
+      // asHexString is the client's own "#rrggbb"; asHex is the number three
+      // other call sites want. A swatch is CSS, so the string.
+      colors[name] = colour.asHexString();
+    }
+    const mp = (mpAllowedColors || []).filter((name) => colors[name]);
+    if (mp.length !== (mpAllowedColors || []).length) {
+      log(`the lobby colour list names ${mpAllowedColors.length}, the rules define ${mp.length}`);
+    }
+    return { mp, colors };
+  }
+
+  /**
    * Every cameo this client can draw, as one sheet and an id -> cell map.
    *
    * The shape `src/cameos.js` used to publish as `window.__cdcCameos`, built
@@ -2846,6 +2887,7 @@
     sample,
     survey,
     roster,
+    colours,
     cameos,
     objectTypes,
     list,

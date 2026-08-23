@@ -82,12 +82,12 @@
         <!-- Both are about this page and nothing else. They used to be one
              setting shared with the game, which read as a page control that
              silently reached into the overlay; the in-game half now has its own
-             on the Overlay settings tab. -->
-        <label class="opt" title="This page only — these cards and the viewer a click opens. Our render is drawn from the map's cell data with the game's own art; the map's own preview is a couple of pixels per cell. Only the default here: each card can be set to one or the other on its own. What the game shows is on the Overlay settings tab.">
+             on the Settings tab. -->
+        <label class="opt" title="This page only — these cards and the viewer a click opens. Our render is drawn from the map's cell data with the game's own art; the map's own preview is a couple of pixels per cell. Only the default here: each card can be set to one or the other on its own. What the game shows is on the Settings tab.">
           <input class="useOriginal" type="checkbox" />
           Show the map's own preview on cards
         </label>
-        <label class="opt" title="This page only — the pictograms on the full-size render the viewer opens: a droplet for an oil derrick, a parachute for an airport. They are drawn over the picture rather than into it, so this takes effect at once, without re-rendering anything. The same marks in game are on the Overlay settings tab.">
+        <label class="opt" title="This page only — the pictograms on the full-size render the viewer opens: a droplet for an oil derrick, a parachute for an airport. They are drawn over the picture rather than into it, so this takes effect at once, without re-rendering anything. The same marks in game are on the Settings tab.">
           <input class="fullIcons" type="checkbox" />
           Mark tech buildings in the viewer
         </label>
@@ -143,16 +143,21 @@
       <p id="storedEmpty" class="empty" hidden></p>
     </section>
 
-    <!-- The settings for the half of the extension that draws over the game.
+    <!-- Every setting the extension has of its own. The tab is named for that
+         rather than for the overlay: the build keys on it write to the game
+         instead of drawing over it, so "Overlay settings" named one half of
+         what is here. The word survives on the two groups it is true of —
+         *Overlay hotkeys*, *Overlay options* — where it still does work, since
+         a ladder tab has page-only options of its own to be told apart from.
          Everything here is prose rather than a tooltip: this is a page you open
          to decide something, and a setting whose scope is behind a hover is the
          reason the ladder tab's preview box was read as having nothing to do
          with the overlay. The tooltips elsewhere explain a list you came to use;
          these explain a choice you came to make. -->
-    <section class="tabpanel" data-tab="overlay" data-label="Overlay settings" role="tabpanel" hidden>
+    <section class="tabpanel" data-tab="overlay" data-label="Settings" role="tabpanel" hidden>
       <div class="settings">
         <section class="setgroup">
-          <h2>Hotkeys</h2>
+          <h2>Overlay hotkeys</h2>
           <!-- A label, not the help symbol it used to be: it is three lines and
                true of every key below, which is little enough to leave on the
                page. What each key *does* is a symbol per row — as is the warning
@@ -166,35 +171,8 @@
           <div id="keys" class="keys-list"></div>
         </section>
 
-        <!-- The one part of the extension that writes to the game rather than
-             drawing over it, so the lede says exactly what a press does. The
-             claim is checkable: one press is one queue action, the same one the
-             sidebar sends, and placement is untouched. -->
         <section class="setgroup">
-          <h2>Build hotkeys</h2>
-          <p class="setlede">
-            A key that queues one of something — the same order clicking its
-            sidebar cameo sends, and nothing else: you still place a building
-            yourself. The game has no build hotkeys of its own, so most of these
-            will be keys it already uses for something; the extension takes the
-            press first, and <code>__cdc.build()</code> in the game tab's
-            console lists which of your bindings override a game command.
-          </p>
-          <p class="setlede">
-            Bindings are per side, because the sides do not build the same
-            things. A key bound to a unit your country cannot build stays inert
-            and says so in the match rather than doing something else.
-          </p>
-          <div id="buildSides" class="buildsides"></div>
-          <div id="buildList" class="keys-list"></div>
-          <div class="buildadd">
-            <select id="buildPick" aria-label="Object to bind"></select>
-            <button id="buildAdd" class="keybtn" type="button">Bind a key…</button>
-          </div>
-        </section>
-
-        <section class="setgroup">
-          <h2>Options</h2>
+          <h2>Overlay options</h2>
           <p class="setlede">
             What the extension draws over the game — the loading-screen panel and
             the in-game overlay, which are the same picture and the same roster at
@@ -250,6 +228,82 @@
                 preview setting to prefer.
               </span>
             </span>
+          </div>
+        </section>
+
+        <!-- The colours the match is played in, by role rather than by slot.
+             The rows are built in options.js from the colour table the game tab
+             harvests out of the client's own rules: a name here has to be one
+             the client's renderer will remap to, so the list cannot be written
+             down in this file. -->
+        <section class="setgroup">
+          <h2>Player colours</h2>
+          <p class="setlede">
+            Who is painted what, whatever they picked in the lobby. The game
+            repaints itself — units, buildings, radar blips, health bars — and
+            nothing is sent to anyone else: this is what your client draws, not
+            what the match is.
+          </p>
+
+          <div class="setrow">
+            <label class="opt">
+              <input id="prefRecolour" type="checkbox" />
+              Repaint players by role
+            </label>
+            <span class="help" tabindex="0" role="note" aria-label="About repainting players">?
+              <span class="tip">
+                Off, everyone plays in the colour they chose. On, each row below
+                that names a colour overrides that player's own for as long as
+                the match lasts. A row left on <em>as picked</em> changes
+                nothing, so you can force one role and leave the rest alone.
+              </span>
+            </span>
+          </div>
+
+          <div id="recolourPanel" class="recolour" hidden>
+            <div class="recolour-row">
+              <span class="recolour-label">You</span>
+              <span class="recolour-swatch" data-for="self"></span>
+              <select id="recolourSelf" class="recolour-pick"></select>
+            </div>
+            <div class="recolour-row">
+              <span class="recolour-label">Allies</span>
+              <span class="recolour-swatch" data-for="ally"></span>
+              <select id="recolourAlly" class="recolour-pick"></select>
+            </div>
+            <!-- One row per opponent, in the lobby's own slot order, so two
+                 enemies do not merge into one colour in 2v2 and free-for-all.
+                 Built in options.js — the count is the client's maximum, not a
+                 number this page invents. -->
+            <div id="recolourEnemies" class="recolour-enemies"></div>
+            <p id="recolourNote" class="recolour-note"></p>
+          </div>
+        </section>
+
+        <!-- The one part of the extension that writes to the game rather than
+             drawing over it, so the lede says exactly what a press does. The
+             claim is checkable: one press is one queue action, the same one the
+             sidebar sends, and placement is untouched. -->
+        <section class="setgroup">
+          <h2>Build hotkeys</h2>
+          <p class="setlede">
+            A key that queues one of something — the same order clicking its
+            sidebar cameo sends, and nothing else: you still place a building
+            yourself. The game has no build hotkeys of its own, so most of these
+            will be keys it already uses for something; the extension takes the
+            press first, and <code>__cdc.build()</code> in the game tab's
+            console lists which of your bindings override a game command.
+          </p>
+          <p class="setlede">
+            Bindings are per side, because the sides do not build the same
+            things. A key bound to a unit your country cannot build stays inert
+            and says so in the match rather than doing something else.
+          </p>
+          <div id="buildSides" class="buildsides"></div>
+          <div id="buildList" class="keys-list"></div>
+          <div class="buildadd">
+            <select id="buildPick" aria-label="Object to bind"></select>
+            <button id="buildAdd" class="keybtn" type="button">Bind a key…</button>
           </div>
         </section>
       </div>
@@ -521,7 +575,7 @@
               <input id="backupGameOpts" type="checkbox" checked />
               Other game options
             </label>
-            <label class="opt" title="The extension's own: the number keys, the build hotkeys per side, the chord grids, and the tick boxes on the Overlay settings tab.">
+            <label class="opt" title="The extension's own: the number keys, the build hotkeys per side, the chord grids, and the tick boxes on the Settings tab.">
               <input id="backupBindings" type="checkbox" checked />
               Extension bindings
             </label>

@@ -91,6 +91,15 @@
     // fire its own events, so the pointer lock and the world interaction the
     // menu turns off are turned back on by the client itself.
     gameMenu: "gui/screen/game/GameMenu",
+    // The match itself, for the recolour. `Game#init` is where the client
+    // forms the teams' alliances and learns which player is the local one —
+    // the earliest moment the role of every player is knowable, and still
+    // before a single renderable exists to have baked a palette. Anything
+    // later would be a repaint; this is a colour that was never wrong.
+    game: "game/Game",
+    // Named rather than numbered: `EventType.AllianceChange` is 46 in this
+    // client and there is no reason for that to be our constant.
+    eventType: "game/event/EventType",
   };
 
   /**
@@ -134,6 +143,8 @@
     pingMonitor: "PingMonitor",
     loadInfoParser: "LoadInfoParser",
     gameMenu: "GameMenu",
+    game: "Game",
+    eventType: "EventType",
   };
 
   /**
@@ -471,6 +482,10 @@
       // tab button. On by default: the whole point is that it answers a
       // question you did not have to ask it.
       sidebarKeys: true,
+      // Repaint the players of a match by role rather than by what they picked.
+      // Off by default — it changes what every match looks like, so it is opted
+      // into. See the Player colours section for what the three fields mean.
+      recolour: { on: false, self: "", ally: "", enemies: [] },
     },
     // map key -> "ours" | "original", set per card in the options page. It
     // outranks `prefs.preferHqPreview` for the map it names; a map that is not
@@ -485,6 +500,16 @@
     // no wire to storage of its own.
     spriteFix: {},
     spriteFixByName: {},
+    // name -> "#rrggbb" for every colour this client's rules define, plus which
+    // of them a lobby offers, and the client version it was read from. Unlike
+    // the build roster, whose stamp travels alone because the table is hundreds
+    // of rows, this one is a few dozen short strings and rides in the config
+    // push whole. Read back here so the loading screen can paint a row without
+    // a rules walk.
+    colours: { version: "", mp: [], colors: {} },
+    // The live match's recolour: the unsubscribe for the alliance watch, and
+    // what the last apply painted, for the debug panel.
+    recolour: { off: null, painted: 0, why: "no match" },
   };
 
   const EVENT_LIMIT = 60;
@@ -551,6 +576,223 @@
     return known ? known.label : countryName;
   }
 
+  // --- Player colours -------------------------------------------------------
+
+  /**
+   * The recolour preference, normalised to the shape the two appliers read.
+   *
+   * A preference arrives from storage, so every field of it is whatever was
+   * last written there — including nothing at all, on a profile that predates
+   * the feature. Normalising once here is what lets the rest of this section be
+   * about colour rather than about defensive reads.
+   *
+   * @returns {{ on: boolean, self: string, ally: string, enemies: string[] }}
+   */
+  function recolourPrefs() {
+    const raw = (state.prefs && state.prefs.recolour) || {};
+    return {
+      on: raw.on === true,
+      self: typeof raw.self === "string" ? raw.self : "",
+      ally: typeof raw.ally === "string" ? raw.ally : "",
+      enemies: Array.isArray(raw.enemies)
+        ? raw.enemies.map((name) => (typeof name === "string" ? name : ""))
+        : [],
+    };
+  }
+
+  /**
+   * Which colour name each player should be painted, by role.
+   *
+   * `players` is `[{ key, role }]` in **player order** — the order the client
+   * keeps its own player list in, which is the lobby's slot order. `key` is
+   * whatever the caller wants back out: a `Player` object in a match, a name on
+   * the loading screen. Roles are `"self"`, `"ally"`, `"enemy"`.
+   *
+   * The two role colours are one name each; enemies take an ordered list, so
+   * two opponents do not merge into one side in 2v2 and FFA. **The enemy
+   * counter advances on every enemy, including one whose slot is blank** — the
+   * second enemy is always the second slot, so leaving slot 1 as picked does not
+   * shift everyone up by one.
+   *
+   * A blank name means *keep what they picked*, so this returns only the players
+   * it has something to say about.
+   *
+   * @returns {Map<*, string>} key -> colour name
+   */
+  function recolourPlan(players, prefs) {
+    const out = new Map();
+    if (!prefs.on) return out;
+    let nth = 0;
+    for (const player of players) {
+      let name = "";
+      if (player.role === "self") name = prefs.self;
+      else if (player.role === "ally") name = prefs.ally;
+      else name = prefs.enemies[nth++] || "";
+      if (name) out.set(player.key, name);
+    }
+    return out;
+  }
+
+  /**
+   * The role of every combatant of a live match, in player order.
+   *
+   * "Ally" is the client's own answer — `Alliances#areAllied`, the same call the
+   * game asks before deciding whether a weapon may fire — rather than the
+   * lobby's teams, so an alliance formed or broken during the match counts.
+   */
+  function matchRoles(game, local) {
+    return game.getCombatants().map((player) => ({
+      key: player,
+      role:
+        player === local
+          ? "self"
+          : game.alliances && game.alliances.areAllied(local, player)
+            ? "ally"
+            : "enemy",
+    }));
+  }
+
+  /**
+   * Repaint a live match.
+   *
+   * The whole feature is this assignment. Every renderable the client builds
+   * re-reads `owner.color` on each update and re-remaps its palette when it
+   * differs — the path that exists so a mind-controlled tank turns Yuri's
+   * colour — so one write repaints that player's army, their radar blips, their
+   * health bars and their control-group tags, and we draw none of it.
+   *
+   * **A colour is only ever taken by name out of `rules.colors`.** With sprite
+   * batching on, a batched voxel builder resolves its palette by content hash
+   * against a list precomputed from exactly that map, and throws *inside the
+   * render loop* when the hash misses. So an invented `new Color(255, 0, 0)` is
+   * not a red, it is a crash; a name the client does not have is skipped with a
+   * line in the log rather than guessed at.
+   *
+   * Colour is absent from `Player#getHash()` and nothing sends it, so this is
+   * local render state only: no desync, nothing on the wire. It reveals nothing
+   * either — every client already knows every alliance, because the action that
+   * forms one travels through the same lockstep everyone replays.
+   */
+  function applyRecolour(game, why) {
+    const prefs = recolourPrefs();
+    if (!prefs.on) {
+      state.recolour.why = "off";
+      return;
+    }
+    const local = game && game.localPlayer;
+    if (!local || typeof game.getCombatants !== "function") {
+      state.recolour.why = "no local player";
+      return;
+    }
+    // An observer has no side, so it has no enemies either. That the client
+    // builds ObserverUi instead of CombatantUi is the same observation.
+    if (local.isObserver) {
+      state.recolour.why = "observing";
+      return;
+    }
+    const colours = game.rules && game.rules.colors;
+    if (!colours || typeof colours.get !== "function") {
+      note("this client's rules carry no colour table — players keep what they picked", "warn");
+      state.recolour.why = "no colour table";
+      return;
+    }
+
+    let painted = 0;
+    for (const [player, name] of recolourPlan(matchRoles(game, local), prefs)) {
+      const colour = colours.get(name);
+      if (!colour) {
+        note(`no colour named "${name}" in this client's rules — ${player.name} keeps their own`, "warn");
+        continue;
+      }
+      // The rules hand back the same Color object every time, so identity is
+      // also the guard against writing a colour that is already on.
+      if (player.color === colour) continue;
+      player.color = colour;
+      painted++;
+    }
+    state.recolour.painted = painted;
+    state.recolour.why = why;
+    if (painted) note(`recoloured ${painted} player(s) — ${why}`);
+  }
+
+  /**
+   * Watch for alliances forming and breaking, and repaint when one does.
+   *
+   * Two things are worth knowing about a mid-match repaint, and neither is a
+   * defect of this watch. The **radar** takes a tile's colour when the tile is
+   * dirtied rather than every frame, so blips already drawn keep the old colour
+   * until each object next moves; the world itself repaints at once. And the
+   * enemy list is ordinal, so an enemy turning ally renumbers the ones after
+   * them — enemy #2 becomes enemy #1 and takes that slot's colour. At the start
+   * of a match, which is where this normally runs, neither can be seen.
+   */
+  function watchAlliances(game) {
+    detachRecolour();
+    const EventType = state.modules.EventType;
+    if (!game.events || typeof game.events.subscribe !== "function" || !EventType) return;
+    const off = game.events.subscribe(EventType.AllianceChange, () => {
+      applyRecolour(game, "alliance change");
+    });
+    state.recolour.off = typeof off === "function" ? off : null;
+  }
+
+  /** Let go of the last match's alliance watch. */
+  function detachRecolour() {
+    if (typeof state.recolour.off === "function") {
+      try {
+        state.recolour.off();
+      } catch (e) {
+        note(`could not release the alliance watch — ${e && e.message}`, "warn");
+      }
+    }
+    state.recolour.off = null;
+  }
+
+  /**
+   * The same plan, for the roster of a loading screen — which is a different
+   * world from the one above: there are no `Player` objects yet, no alliances
+   * and no rules table, only the props React is drawing the rows from.
+   *
+   * So the two inputs are what that screen actually knows. **Ally is the
+   * lobby's team**, not `areAllied`, because an alliance does not exist until
+   * `Game#init` forms it. And **self is a name or nothing**: `decorateRows`
+   * identifies you by your country, which is ambiguous when someone else picked
+   * the same one — with no self there is no "enemy" either, so the screen is
+   * left in the colours the client chose rather than painted from a guess.
+   *
+   * @param {Array<{name: string, team: *}>} roster in the props' own order
+   * @param {string|null} selfName
+   * @returns {Map<string, string>} player name -> colour name
+   */
+  function loadingRecolourPlan(roster, selfName) {
+    const prefs = recolourPrefs();
+    if (!prefs.on || !selfName) return new Map();
+    const self = roster.find((p) => p.name === selfName);
+    const teamed = self && self.team !== undefined && self.team !== null;
+    return recolourPlan(
+      roster.map((p) => ({
+        key: p.name,
+        role:
+          p.name === selfName ? "self" : teamed && p.team === self.team ? "ally" : "enemy",
+      })),
+      prefs
+    );
+  }
+
+  /**
+   * The hex a colour name draws as, out of the table harvested from the
+   * client's own rules.
+   *
+   * The loading screen has no rules object to ask, and this runs on every React
+   * re-render of a row — a rules walk per tick is not what that moment is for.
+   * The table is a few dozen short strings in storage, pushed with every other
+   * setting.
+   */
+  function colourHex(name) {
+    const table = state.colours && state.colours.colors;
+    return (table && table[name]) || "";
+  }
+
   // --- Faction labels -------------------------------------------------------
 
   function decorateRows(screen) {
@@ -567,12 +809,21 @@
     const sameCountry = roster.filter((p) => p.country.name === props.countryName);
     const selfName = sameCountry.length === 1 ? sameCountry[0].name : null;
 
+    // The recolour, on a screen the client draws before a single Player object
+    // exists — so it is computed from the props' own teams, not from alliances.
+    // See loadingRecolourPlan. An empty plan is the feature switched off, and
+    // `paint` then hands back exactly what the client picked.
+    const recoloured = loadingRecolourPlan(roster, selfName);
+    const paint = (name, fallback) => colourHex(recoloured.get(name)) || fallback;
+
     state.players = roster.map((p) => ({
       name: p.name,
       country: p.country.name,
       label: factionLabel(p.country.name, props),
       side: FACTIONS[p.country.name] ? FACTIONS[p.country.name].side : "",
-      color: p.color || "#fff",
+      // Our own panel and the `1` overlay draw the name in this, so both follow
+      // the recolour without knowing it happened.
+      color: paint(p.name, p.color || "#fff"),
       team: p.team,
       self: selfName !== null && p.name === selfName,
     }));
@@ -600,6 +851,15 @@
       }
       if (tag.textContent !== label) tag.textContent = label;
       if (tag.dataset.side !== side) tag.dataset.side = side;
+
+      // The client's own row. Its colour is an inline style React writes from
+      // `playerInfos[i].color`, so this is a write over a write and is made
+      // unconditionally: `style.color` reads back as `rgb(r, g, b)` and could
+      // not be compared against a hex anyway, and a re-render that restored the
+      // client's value would defeat a stamp saying we had already been here.
+      // Eight rows a few times a second is not a cost worth guarding.
+      const hex = paint(nameEl.textContent, "");
+      if (hex) row.style.color = hex;
     });
     return true;
   }
@@ -888,13 +1148,24 @@
           // The boot attempt runs before hq-preview may have finished loading,
           // and a first run with no game files yet has nothing to read. By here
           // both are settled.
+          //
+          // This is the attempt that actually lands, which is why both tables
+          // are told to say "play a match" rather than "open the game": the
+          // client parses rules.ini during its own boot, well before the main
+          // menu, but the boot harvest is fired from a config push at idle and
+          // that push routinely wins the race against a five-second splash, a
+          // Cloudflare check and a resource load. A match is simply the first
+          // moment everything is certainly up.
           sendRoster();
+          sendColours();
           return originalInit.apply(this, args);
         };
         if (typeof Combatant.prototype.dispose === "function") {
           const originalDispose = Combatant.prototype.dispose;
           Combatant.prototype.dispose = function (...args) {
             if (state.combatant === this) state.combatant = null;
+            // The bus these are on belongs to the match that has just ended.
+            detachRecolour();
             // The queues these predictions were about have gone with this
             // CombatantUi, so they were neither confirmed nor dropped by the
             // client and reporting either would be a lie.
@@ -917,6 +1188,35 @@
         state.hooks.combatantUi = true;
       } else {
         note("CombatantUi#init unavailable — build hotkeys will not work", "warn");
+      }
+
+      // The recolour, on the one call that is late enough to know every
+      // player's role and early enough that nothing has been drawn in the
+      // wrong colour yet. `Game#init` receives the local player and ends by
+      // forming the lobby's teams into alliances; the first renderable is
+      // built after it returns, and reads the colour we have just written as
+      // if it were the one picked in the lobby. Hooking CombatantUi instead
+      // would have been a repaint, and would have had to assume an ordering
+      // between two inits.
+      const Game = state.modules.Game;
+      if (Game && Game.prototype && typeof Game.prototype.init === "function") {
+        const originalGameInit = Game.prototype.init;
+        Game.prototype.init = function (...args) {
+          const out = originalGameInit.apply(this, args);
+          try {
+            applyRecolour(this, "match start");
+            watchAlliances(this);
+          } catch (e) {
+            // A colour must never cost anyone a match: whatever went wrong
+            // here, the client's own init has already run and the game is
+            // playable in the colours the lobby picked.
+            note(`recolour failed (${e && e.message}) — players keep what they picked`, "warn");
+          }
+          return out;
+        };
+        state.hooks.recolour = true;
+      } else {
+        note("Game#init unavailable — players keep the colours they picked", "warn");
       }
 
       const installed = Object.keys(state.hooks).filter((k) => state.hooks[k]);
@@ -2610,12 +2910,15 @@
     if (typeof data.replayTypesVersion === "string") {
       state.replayTypesVersion = data.replayTypesVersion;
     }
+    // The colour table, whole rather than as a stamp — see sendColours.
+    if (data.colours && data.colours.colors) state.colours = data.colours;
     // At idle, because it parses the whole of rules.ini: nothing waits on the
     // roster, and the alternative is a stutter on a page that has just loaded.
     // `requestIdleCallback` is not in every engine the extension claims to
     // support, hence the timeout behind it.
     const harvest = () => {
       sendRoster();
+      sendColours();
       autoHarvest();
     };
     if (typeof window.requestIdleCallback === "function") {
@@ -6265,6 +6568,48 @@
   }
 
   let rosterSent = false;
+  let coloursSent = false;
+
+  /**
+   * The colour table, harvested from the client's rules and handed to the
+   * bridge for the options page to offer.
+   *
+   * On exactly the terms of `sendRoster` below, and for the same reason: the
+   * options page has no client, so this is the only place the list can come
+   * from, and the client's own version is the stamp that says whether a
+   * harvest would say anything new. The difference is size — thirty-odd short
+   * strings — which is why the table itself travels in the config push rather
+   * than a stamp with the rows left in storage.
+   */
+  async function sendColours(force) {
+    if (coloursSent && !force) return;
+    const version = clientVersion();
+    if (!force && version && state.colours.version === version) {
+      coloursSent = true;
+      return;
+    }
+    if (!window.__cdcHq || typeof window.__cdcHq.colours !== "function") return;
+    try {
+      const { mp, colors } = await window.__cdcHq.colours();
+      const names = Object.keys(colors);
+      if (!names.length) {
+        note("the client's rules define no colours — the recolour option has nothing to offer", "warn");
+        return;
+      }
+      coloursSent = true;
+      state.colours = { version, mp, colors };
+      window.postMessage(
+        { source: "cdc-page", type: "colour-table", colours: { version, at: Date.now(), mp, colors } },
+        "*"
+      );
+      note(`colour table: ${names.length} colours, ${mp.length} of them in the lobby`);
+    } catch (e) {
+      // Same as the roster below: the rules live in the game archives, so this
+      // failing on a cold first run is a client that has not imported them yet,
+      // not a defect. The next config push tries again.
+      note(`could not read the colour table (${e && e.message})`, "warn");
+    }
+  }
 
   async function sendRoster(force) {
     if (rosterSent && !force) return;
@@ -7066,6 +7411,10 @@
       previewRendered: state.map ? "yes" : "no",
       mapFacts: state.map ? JSON.stringify(state.map.facts) : "n/a",
       mapPanelMounted: screen ? !!screen.querySelector(".cdc-map") : false,
+      // The recolour answers two questions: whether the client still has the
+      // table we pick names out of, and what the last match did about it.
+      coloursKnown: Object.keys(state.colours.colors).length,
+      recolour: recolourPrefs().on ? `${state.recolour.painted} painted — ${state.recolour.why}` : "off",
     };
     console.table(result);
     return result;

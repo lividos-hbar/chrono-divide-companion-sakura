@@ -37,6 +37,12 @@
   const prefGrabTabKeysEl = document.getElementById("prefGrabTabKeys");
   const prefFullscreenEnterEl = document.getElementById("prefFullscreenEnter");
   const prefMenuOffEscapeEl = document.getElementById("prefMenuOffEscape");
+  const prefRecolourEl = document.getElementById("prefRecolour");
+  const recolourPanelEl = document.getElementById("recolourPanel");
+  const recolourSelfEl = document.getElementById("recolourSelf");
+  const recolourAllyEl = document.getElementById("recolourAlly");
+  const recolourEnemiesEl = document.getElementById("recolourEnemies");
+  const recolourNoteEl = document.getElementById("recolourNote");
   const lightboxEl = document.getElementById("lightbox");
   const lightboxImgEl = document.getElementById("lightboxImg");
   const storedListEl = document.getElementById("storedList");
@@ -209,6 +215,10 @@
     grabTabKeys: true, // in game: the tab keys are ours while it is fullscreen
     fullscreenOnEnter: true, // in game: the client's Alt+F fullscreen moves to Alt+Enter
     menuOffEscape: true, // in game: the menu leaves Escape for a key of ours
+    // in game: repaint players by role. Off by default — it changes what every
+    // match looks like. A blank name is "keep what they picked", so the shape
+    // below is also what "on, but nothing chosen yet" looks like.
+    recolour: { on: false, self: "", ally: "", enemies: [] },
     cardPreferHq: true, // this page: our render on the cards
     viewerIcons: true, // this page: the pictograms in the viewer
   };
@@ -237,6 +247,11 @@
   // be built, harvested in the game tab because only it has the rules. Empty
   // until the game has been opened once with this extension installed.
   let roster = {};
+  // { version, at, mp: [name, …], colors: { name: "#rrggbb" } } — written by
+  // the game tab out of the client's own rules, read here. This page has no
+  // client, so it is the only place the list can come from; see sendColours in
+  // src/companion.js.
+  let colours = {};
   // Which side's profile the panel is showing. Not stored: it is a view of the
   // page, not a setting, and it starts on the side that already has bindings.
   let buildSide = "";
@@ -660,7 +675,7 @@
       empty.className = "count";
       empty.textContent = rosterItems().length
         ? "No build keys for this side yet."
-        : "No roster yet — open the game once with the extension installed and it is read from the client.";
+        : "No roster yet — play a match once with the extension installed and it is read from the client.";
       buildListEl.append(empty);
       return;
     }
@@ -1408,6 +1423,7 @@
     prefGrabTabKeysEl.checked = prefs.grabTabKeys !== false;
     prefFullscreenEnterEl.checked = prefs.fullscreenOnEnter !== false;
     prefMenuOffEscapeEl.checked = prefs.menuOffEscape !== false;
+    renderRecolour();
     alignPanel.onPrefs();
   }
 
@@ -1451,6 +1467,177 @@
   prefMenuOffEscapeEl.addEventListener("change", () => {
     setPrefs({ menuOffEscape: prefMenuOffEscapeEl.checked });
   });
+
+
+  // --- player colours -------------------------------------------------------
+
+  /**
+   * How many opponents a row is offered for.
+   *
+   * Eight slots is the client's own maximum for a match, so seven is every
+   * opponent you can have at once. Rows are cheap and a fixed count needs no
+   * "how many players will there be" question that this page could not answer
+   * anyway — the match it is setting up has not been made yet.
+   */
+  const MAX_ENEMIES = 7;
+
+  /** The preference, with every field the shape the rest of this section reads. */
+  function recolourPrefs() {
+    const raw = prefs.recolour || {};
+    return {
+      on: raw.on === true,
+      self: typeof raw.self === "string" ? raw.self : "",
+      ally: typeof raw.ally === "string" ? raw.ally : "",
+      enemies: Array.isArray(raw.enemies)
+        ? raw.enemies.slice(0, MAX_ENEMIES).map((name) => (typeof name === "string" ? name : ""))
+        : [],
+    };
+  }
+
+  /** Write one field of it back, leaving the others as they are. */
+  function setRecolour(patch) {
+    setPrefs({ recolour: { ...recolourPrefs(), ...patch } });
+  }
+
+  /** name -> "#rrggbb", as the game tab harvested it. */
+  function colourTable() {
+    return (colours && colours.colors) || {};
+  }
+
+  /**
+   * Fill one picker with the colours this client has.
+   *
+   * Two groups, because the eight a lobby offers are the ones a player will
+   * recognise by name and the rest are everything else the rules define — the
+   * civilian greys, the special houses. Both are legal: what the renderer
+   * refuses is a colour that is in no group at all, which is why this page
+   * never offers a hex of its own.
+   *
+   * The option carries its own colour as text, which is as far as a `<select>`
+   * can be styled portably; the swatch beside the row is what actually shows
+   * the chosen one.
+   */
+  function fillColourPicker(select, chosen) {
+    const table = colourTable();
+    const mp = (colours.mp || []).filter((name) => table[name]);
+    const rest = Object.keys(table).filter((name) => !mp.includes(name));
+    select.textContent = "";
+
+    const keep = document.createElement("option");
+    keep.value = "";
+    keep.textContent = "as picked";
+    select.appendChild(keep);
+
+    const group = (label, names) => {
+      if (!names.length) return;
+      const box = document.createElement("optgroup");
+      box.label = label;
+      for (const name of names) {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        option.style.color = table[name];
+        box.appendChild(option);
+      }
+      select.appendChild(box);
+    };
+    group("In the lobby", mp);
+    group("Also in the rules", rest);
+
+    // A stored name this client does not have — an older client's colour, or a
+    // profile carried to a build that renamed one. Shown as itself rather than
+    // dropped silently to "as picked", because the row is the only place the
+    // disagreement is visible; the game tab skips it and says so in its log.
+    if (chosen && !table[chosen]) {
+      const missing = document.createElement("option");
+      missing.value = chosen;
+      missing.textContent = chosen + " — not in this client";
+      select.appendChild(missing);
+    }
+    select.value = chosen || "";
+  }
+
+  /** Paint the little square that says what the row resolves to. */
+  function paintSwatch(el, name) {
+    const hex = colourTable()[name] || "";
+    el.style.background = hex;
+    el.dataset.empty = hex ? "" : "yes";
+    el.title = hex ? `${name} ${hex}` : "as picked";
+  }
+
+  /**
+   * Build the enemy rows once, then keep them in step.
+   *
+   * One row per opponent in the lobby's own slot order. The **counter does not
+   * skip a blank row**: leaving the first as picked and setting the second
+   * still paints the *second* opponent, rather than promoting everyone by one —
+   * so a row means the same opponent whatever the rows above it say. The game
+   * tab's `recolourPlan` is the half that guarantees it; this is the half that
+   * has to describe it.
+   */
+  function renderRecolour() {
+    const current = recolourPrefs();
+    prefRecolourEl.checked = current.on;
+    recolourPanelEl.hidden = !current.on;
+    if (!current.on) return;
+
+    const names = Object.keys(colourTable());
+    recolourNoteEl.textContent = names.length
+      ? `${names.length} colours, read from client ${colours.version || "(unversioned)"}.`
+      : "No colour table yet — play a match once with the extension installed and it is read from the client.";
+
+    if (!recolourEnemiesEl.children.length) {
+      for (let i = 0; i < MAX_ENEMIES; i++) {
+        const row = document.createElement("div");
+        row.className = "recolour-row";
+        const label = document.createElement("span");
+        label.className = "recolour-label";
+        label.textContent = i === 0 ? "Enemies" : "";
+        const swatch = document.createElement("span");
+        swatch.className = "recolour-swatch";
+        const pick = document.createElement("select");
+        pick.className = "recolour-pick";
+        pick.dataset.enemy = String(i);
+        pick.setAttribute("aria-label", `Colour for opponent ${i + 1}`);
+        pick.addEventListener("change", () => {
+          const enemies = recolourPrefs().enemies.slice();
+          while (enemies.length <= i) enemies.push("");
+          enemies[i] = pick.value;
+          // Trailing blanks carry no meaning and would grow the item every time
+          // a row was cleared; the plan reads a missing slot as "as picked".
+          while (enemies.length && !enemies[enemies.length - 1]) enemies.pop();
+          setRecolour({ enemies });
+        });
+        const ordinal = document.createElement("span");
+        ordinal.className = "recolour-ordinal";
+        ordinal.textContent = "#" + (i + 1);
+        row.append(label, ordinal, swatch, pick);
+        recolourEnemiesEl.appendChild(row);
+      }
+    }
+
+    fillColourPicker(recolourSelfEl, current.self);
+    fillColourPicker(recolourAllyEl, current.ally);
+    paintSwatch(recolourPanelEl.querySelector('.recolour-swatch[data-for="self"]'), current.self);
+    paintSwatch(recolourPanelEl.querySelector('.recolour-swatch[data-for="ally"]'), current.ally);
+    for (const pick of recolourEnemiesEl.querySelectorAll(".recolour-pick")) {
+      const i = Number(pick.dataset.enemy);
+      const name = current.enemies[i] || "";
+      fillColourPicker(pick, name);
+      paintSwatch(pick.previousElementSibling, name);
+    }
+  }
+
+  prefRecolourEl.addEventListener("change", () => {
+    setRecolour({ on: prefRecolourEl.checked });
+  });
+
+  // Both take effect on the next match. A match already running keeps the
+  // colours it started with rather than repainting under the player: the
+  // radar takes a tile's colour when the tile is dirtied, so a mid-match
+  // change is half a repaint until every unit has moved.
+  recolourSelfEl.addEventListener("change", () => setRecolour({ self: recolourSelfEl.value }));
+  recolourAllyEl.addEventListener("change", () => setRecolour({ ally: recolourAllyEl.value }));
 
   function clearRenders() {
     const count = Object.keys(renders).length;
@@ -3585,13 +3772,20 @@ The card and its render go. The guide is kept.`)) return;
    *
    * Where the names and the pictures come from is the only thing a reader
    * cannot work out from a timeline full of `vehicle #9`, and it is the whole
-   * of the answer: open the game once, the client hands its own table over, and
+   * of the answer: play a match once, the client hands its own table over, and
    * the rows fill in. Nothing to say once that has happened.
+   *
+   * **A match, not an open client.** The client has parsed its rules long
+   * before the main menu, so the table exists earlier than this asks for — but
+   * the harvest that reads it is fired at idle from a config push, which
+   * regularly arrives while the client is still on its splash screen. The
+   * attempt that reliably lands is the one at match start, and an instruction
+   * that is right about what to do beats one that is right about the client.
    */
   function replayTypesNotice(host) {
     return host.__cdcReplayTypes
       ? ""
-      : "Object names and pictures come from your own game — open it once and these numbered rows fill in.";
+      : "Object names and pictures come from your own game — play a match once and these numbered rows fill in.";
   }
 
   /**
@@ -4523,6 +4717,7 @@ The card and its render go. The guide is kept.`)) return;
       builds: {},
       chords: {},
       roster: {},
+      colours: {},
       prefs: {},
       previewSrc: {},
       spawnFix: {},
@@ -4562,6 +4757,7 @@ The card and its render go. The guide is kept.`)) return;
       builds = data.builds || {};
       chords = migrateChords(data.chords || {});
       roster = data.roster || {};
+      colours = data.colours || {};
       // The harvested sheet, on `window` before anything that draws a cameo
       // runs. Nothing has set it already — no sheet ships — so a profile that
       // has never harvested leaves it unset, and every reader of it treats that
@@ -4664,6 +4860,13 @@ The card and its render go. The guide is kept.`)) return;
       roster = changes.roster.newValue || {};
       renderBuilds();
       renderChords();
+    }
+    // The colour table arrives the same way and for the same reason: a game tab
+    // opened after this page harvests it, and the pickers would otherwise hold
+    // their empty state until a reload.
+    if (changes.colours) {
+      colours = changes.colours.newValue || {};
+      renderRecolour();
     }
     // Another options tab editing the same profiles.
     if (changes.builds) {

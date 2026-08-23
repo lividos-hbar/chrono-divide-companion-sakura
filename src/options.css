@@ -104,46 +104,52 @@ h1 {
 
 /* --- the settings tab ----------------------------------------------------- */
 
-/* Side by side while the window is wide enough for it: both sections are short
-   — four bindings and three tick-boxes — and stacked they put the second one
-   under a fold for no reason. Each column is capped so a line of the lede stays
-   readable rather than running the full half of a 1400px page. */
+/* Side by side while the row is wide enough, and **wrapping when it is not**.
+
+   This row has held two columns, then three, then four, and the version that
+   assumed a count had `flex: 1 1 0; min-width: 0` — every column shrank to a
+   quarter of the row and the Hotkeys column's own buttons hung out of it,
+   because a `.keyrow` is 314px that cannot shrink at all. Shrinking to nothing
+   is the wrong failure: the width a column needs is a fact about its contents,
+   not a share of what is left over.
+
+   So a column has a floor, and a row that cannot fit another one at that floor
+   moves it to the next line instead of taking width from the rest. Adding a
+   fifth column is then a layout question that answers itself.
+   `scripts/check-layout.mjs` holds the floor against the contents it is a
+   floor for. */
 .settings {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
-  gap: 44px;
+  /* Two gaps, and the row gap is the larger job: a column that has wrapped has
+     to read as a new row rather than as the bottom of the one above it. */
+  gap: 32px 44px;
   margin-top: 18px;
 }
 
 .setgroup {
-  flex: 1 1 0;
-  min-width: 0;
+  /* The floor, and it is not a matter of taste: a `.keyrow` is a 200px label,
+     a 6px gap and a 108px button, none of which shrink. A column narrower than
+     that is a column with its contents hanging out of it, so 340px is 314 plus
+     the slack to notice in.
+
+     `min()` for the window that is itself narrower than the floor — there, one
+     column is the whole row, and the page still fits. */
+  flex: 1 1 340px;
+  min-width: min(340px, 100%);
+  /* Capped so a line of the lede stays readable rather than running the full
+     half of a 1400px page. */
   max-width: 62ch;
-}
-
-.setgroup + .setgroup {
-  padding-left: 44px;
-  border-left: 1px solid var(--line);
-}
-
-/* Narrow: one under the other, and the divider turns with them — a border on
-   the left of a full-width block is a stripe down the page. */
-@media (max-width: 1080px) {
-  .settings {
-    display: block;
-  }
-
-  .setgroup {
-    max-width: 62ch;
-  }
-
-  .setgroup + .setgroup {
-    margin-top: 34px;
-    padding-top: 26px;
-    padding-left: 0;
-    border-left: 0;
-    border-top: 1px solid var(--line);
-  }
+  padding-top: 14px;
+  /* The divider is on the top rather than between siblings, and that is what
+     makes it safe to wrap: `.setgroup + .setgroup { border-left }` draws a rule
+     down the left of the first column of every wrapped row, where there is no
+     neighbour to divide it from — and which column that is cannot be known in
+     CSS, since it depends on how many fitted. A rule that is the same in every
+     orientation cannot be wrong in one of them, which is also why the narrow
+     media query this replaces had to turn the rule on its side. */
+  border-top: 1px solid var(--line);
 }
 
 /* The section's own lead-in. Not `.lede`: that one is right-aligned and sized
@@ -176,6 +182,86 @@ h1 {
 .tip em {
   font-style: normal;
   color: var(--accent);
+}
+
+/* --- the player-colour rows ----------------------------------------------- */
+
+/* Folded away entirely while the setting is off: the rows only mean anything
+   once something is being repainted, and eight pickers under an unticked box
+   read as a section that does not work. */
+.recolour {
+  margin-top: 14px;
+  padding-left: 22px;
+  border-left: 1px solid var(--line);
+}
+
+.recolour-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* One column for the role, so the three groups line up as a table rather than
+   as three sentences of different lengths. Only the first enemy row is
+   labelled — the rest are the same role, and repeating the word down seven
+   rows would read as seven roles. */
+.recolour-label {
+  flex: 0 0 62px;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+/* Which opponent this row is, and it is fixed rather than counted at render:
+   a blank row still holds its place, so #2 is the second opponent whatever #1
+   says. */
+.recolour-ordinal {
+  flex: 0 0 20px;
+  color: var(--dim);
+  font-size: 12px;
+  text-align: right;
+}
+
+/* The colour itself, which a `<select>` cannot show: the option text can be
+   coloured, the closed control cannot. Hatched when the row is "as picked", so
+   an empty square is visibly a choice rather than a colour that failed to
+   load. */
+.recolour-swatch {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+
+.recolour-swatch[data-empty="yes"] {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--panel),
+    var(--panel) 3px,
+    var(--line) 3px,
+    var(--line) 5px
+  );
+}
+
+.recolour-pick {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 22ch;
+  padding: 3px 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.recolour-note {
+  margin: 12px 0 0;
+  color: var(--dim);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 /* --- help symbol and its tooltip ----------------------------------------- */

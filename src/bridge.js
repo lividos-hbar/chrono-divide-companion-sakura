@@ -76,11 +76,24 @@
  *            reading contract.
  *   replayTypesVersion: "0.83.3/1" — on exactly the terms of `cameoVersion`
  *            above, and written in the same set as `replayTypes`.
+ *   colours: { version, at, mp: [name, …], colors: { name: "#rrggbb" } }
+ *            Every colour this client's rules define, and which of them a
+ *            lobby offers. Harvested in the game tab like the build roster,
+ *            and the table the recolour preference picks names out of — a
+ *            name, never a hex, because the client's renderer will only remap
+ *            to a colour its own rules already hold. Small enough (a few
+ *            dozen short strings) that the whole table travels in the config
+ *            push rather than a stamp with the rows left behind.
  *   prefs:   { preferHqPreview: bool, autoRender: bool, fullIcons: bool,
  *              captureSample: bool, chordSinglePress: bool, grabTabKeys: bool,
  *              fullscreenOnEnter: bool, menuOffEscape: bool,
  *              sidebarKeys: bool,
+ *              recolour: { on: bool, self: name, ally: name,
+ *                          enemies: [name, …] },
  *              cardPreferHq: bool, viewerIcons: bool }
+ *            `recolour` repaints the players of a match by role — a blank
+ *            name is "keep what they picked", and `enemies` is ordered, so
+ *            the second opponent takes the second entry.
  *            The first three are what the game draws — the loading-screen panel
  *            and the overlay; the two after captureSample are what the chord
  *            keys do, one of which takes a browser keyboard lock and so has to
@@ -161,6 +174,9 @@
     // The same, for the object table: hundreds of rows in storage, one short
     // string in a config push. See rememberReplayTypes.
     replayTypesVersion: "",
+    // Whole, unlike the two stamps above: see the contract at the top of the
+    // file for why this table travels and those do not.
+    colours: {},
     prefs: {},
     previewSrc: {},
     spawnFix: {},
@@ -944,6 +960,27 @@
   }
 
   /**
+   * The colour table, replaced whole.
+   *
+   * Replaced for the reason `rememberRoster` above is: it is one client's
+   * answer about one version of itself, and a colour an older client defined
+   * that a newer one dropped would sit in the options page offering a name the
+   * renderer would refuse. The stamp rides inside the table rather than beside
+   * it — it is small enough that no config push has to choose between them.
+   */
+  function rememberColours(colours) {
+    if (!colours || !colours.colors || !Object.keys(colours.colors).length) {
+      console.warn(TAG, "empty colour table ignored", colours);
+      return;
+    }
+    write({ colours });
+    logLine(
+      `colour table: ${Object.keys(colours.colors).length} colours from client ` +
+        `${colours.version || "(unversioned)"}`
+    );
+  }
+
+  /**
    * The harvested cameo sheet, and the stamp that says what drew it.
    *
    * **Two keys for one harvest, deliberately.** `cameos` is the pixels — a
@@ -1044,6 +1081,8 @@
       renameMaps(data.names);
     } else if (data.type === "build-roster") {
       rememberRoster(data.roster);
+    } else if (data.type === "colour-table") {
+      rememberColours(data.colours);
     } else if (data.type === "cameo-sheet") {
       rememberCameos(data.cameos);
     } else if (data.type === "replay-types") {

@@ -2878,6 +2878,7 @@
     if (data.version) {
       VERSION = data.version;
       announce();
+      watchForLobbyPage();
     }
     if (typeof data.count === "number") state.catalogue = data.count;
 
@@ -7822,7 +7823,55 @@
         (window.__cdcHud ? `, ${state.keys.debug.label} debug panel` : "")
     );
   }
+
+  /**
+   * Put the same sort of short, out-of-band notice the client uses for an idle
+   * page above the lobby.  A console line is useful while developing, but it
+   * leaves a player who has just joined a channel with no indication that the
+   * extension which supplies their lobby and match helpers is actually live.
+   *
+   * The welcome text is supplied by the server, so it is a better boundary than
+   * a route or a client class name: it is present for every realm and only after
+   * the channel is ready to be read.  It also keeps this deliberately out of a
+   * match and out of the login screen.  We watch rather than relying on a single
+   * timeout because a cold client can finish loading the channel well after the
+   * extension and its storage bridge have both started.
+   */
+  let lobbyPageDelivered = false;
+  let lobbyPageWatch = null;
+  const LOBBY_JOIN_TEXT = "You joined channel ";
+
+  function lobbyJoinedChannel() {
+    return document.body && document.body.textContent.includes(LOBBY_JOIN_TEXT);
+  }
+
+  function showLobbyPage() {
+    if (lobbyPageDelivered || VERSION === "?" || !lobbyJoinedChannel()) return false;
+    lobbyPageDelivered = true;
+    if (lobbyPageWatch) lobbyPageWatch.disconnect();
+
+    const page = document.createElement("div");
+    page.className = "cdc-lobby-page";
+    page.setAttribute("role", "status");
+    page.textContent = `(CD-Companion) Successfully loaded version ${VERSION}`;
+    document.body.append(page);
+    // A page is deliberately transient: it confirms the load without becoming
+    // another line in the player's channel history or covering the lobby.
+    setTimeout(() => page.remove(), 9000);
+    note(`lobby page delivered — ${page.textContent}`);
+    return true;
+  }
+
+  function watchForLobbyPage() {
+    if (lobbyPageDelivered || !document.body) return;
+    showLobbyPage();
+    if (lobbyPageDelivered || lobbyPageWatch) return;
+    lobbyPageWatch = new MutationObserver(() => showLobbyPage());
+    lobbyPageWatch.observe(document.body, { childList: true, characterData: true, subtree: true });
+  }
+
   // Called from the config handler the moment the version lands; this is the
   // floor under it, for the tab where the bridge never replies at all.
   setTimeout(announce, 3000);
+  watchForLobbyPage();
 })();

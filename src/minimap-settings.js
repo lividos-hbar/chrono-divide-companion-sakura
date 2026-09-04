@@ -11,6 +11,7 @@
     playerColoursMatchMode: "1v1",
     playerColoursEnemyMode: "same",
     playerColoursOrder: ["DarkRed", "DarkBlue"],
+    minimapRadar: { on: true, litLo: 0.10, litHi: 0.34, shLo: 0.03, shHi: 0.09, sat: 0.25, oreLift: 0.06, unit: 1, halo: 0 },
   };
   const PLAYER_COLOURS = ["Gold", "DarkRed", "DarkBlue", "DarkGreen", "Orange", "DarkSky", "Purple", "Magenta"];
 
@@ -26,6 +27,9 @@
     playerColoursEnemyMode: $("playerColoursEnemyMode"),
     playerColoursFirst: $("playerColoursFirst"),
     playerColoursSecond: $("playerColoursSecond"),
+    radarOn: $("radarOn"), radarLitLo: $("radarLitLo"), radarLitHi: $("radarLitHi"),
+    radarShLo: $("radarShLo"), radarShHi: $("radarShHi"), radarSat: $("radarSat"),
+    radarOreLift: $("radarOreLift"), radarUnit: $("radarUnit"), radarHalo: $("radarHalo"),
   };
 
   function fillColourSelects() {
@@ -47,6 +51,9 @@
       controls.playerColoursEnemyMode.value = p.playerColoursEnemyMode;
       controls.playerColoursFirst.value = p.playerColoursOrder[0];
       controls.playerColoursSecond.value = p.playerColoursOrder[1] || p.playerColoursOrder[0];
+      const radar = { ...DEFAULTS.minimapRadar, ...(p.minimapRadar || {}) };
+      controls.radarOn.checked = radar.on;
+      for (const [key, control] of Object.entries({ litLo: controls.radarLitLo, litHi: controls.radarLitHi, shLo: controls.radarShLo, shHi: controls.radarShHi, sat: controls.radarSat, oreLift: controls.radarOreLift, unit: controls.radarUnit, halo: controls.radarHalo })) control.value = radar[key];
       renderPreview();
     });
   }
@@ -64,9 +71,16 @@
         playerColoursMatchMode: controls.playerColoursMatchMode.value,
         playerColoursEnemyMode: controls.playerColoursEnemyMode.value,
         playerColoursOrder: [controls.playerColoursFirst.value, controls.playerColoursSecond.value],
+        minimapRadar: {
+          on: controls.radarOn.checked,
+          litLo: Number(controls.radarLitLo.value), litHi: Number(controls.radarLitHi.value),
+          shLo: Number(controls.radarShLo.value), shHi: Number(controls.radarShHi.value),
+          sat: Number(controls.radarSat.value), oreLift: Number(controls.radarOreLift.value),
+          unit: Number(controls.radarUnit.value), halo: Number(controls.radarHalo.value),
+        },
       };
       chrome.storage.local.set({ prefs: next }, () => {
-        $("status").textContent = "Saved. Reload the game tab to test it.";
+        $("status").textContent = "Saved. It will apply to every match; an open tab repaints on its next radar update.";
         renderPreview();
       });
     });
@@ -91,6 +105,8 @@
     controls.playerColoursEnemyMode.value = DEFAULTS.playerColoursEnemyMode;
     controls.playerColoursFirst.value = DEFAULTS.playerColoursOrder[0];
     controls.playerColoursSecond.value = DEFAULTS.playerColoursOrder[1];
+    controls.radarOn.checked = DEFAULTS.minimapRadar.on;
+    for (const [key, control] of Object.entries({ litLo: controls.radarLitLo, litHi: controls.radarLitHi, shLo: controls.radarShLo, shHi: controls.radarShHi, sat: controls.radarSat, oreLift: controls.radarOreLift, unit: controls.radarUnit, halo: controls.radarHalo })) control.value = DEFAULTS.minimapRadar[key];
     save();
   });
   $("fullOptions").addEventListener("click", () => chrome.runtime.openOptionsPage());

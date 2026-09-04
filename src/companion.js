@@ -2878,6 +2878,7 @@
     if (data.version) {
       VERSION = data.version;
       announce();
+      watchForLobbyPage();
     }
     if (typeof data.count === "number") state.catalogue = data.count;
 
@@ -7822,7 +7823,54 @@
         (window.__cdcHud ? `, ${state.keys.debug.label} debug panel` : "")
     );
   }
+
+  /**
+   * Put the load notice through the client's own XWOL page path.  frames.js
+   * retains the real channel-join packet before the client parses it, so this
+   * call replays a protocol-correct page rather than building a lookalike DOM
+   * banner.  The chat client therefore gives it the same sender, placement and
+   * lifetime as its `(xwol-*) You are away` pages.
+   *
+   * The welcome text is supplied by the server, so it is a better boundary than
+   * a route or a client class name: it is present for every realm and only after
+   * the channel is ready to be read.  It also keeps this deliberately out of a
+   * match and out of the login screen.  We watch rather than relying on a single
+   * timeout because a cold client can finish loading the channel well after the
+   * extension and its storage bridge have both started.
+   */
+  let lobbyPageDelivered = false;
+  let lobbyPageWatch = null;
+  const LOBBY_JOIN_TEXT = "You joined channel ";
+
+  function lobbyJoinedChannel() {
+    return document.body && document.body.textContent.includes(LOBBY_JOIN_TEXT);
+  }
+
+  function showLobbyPage() {
+    if (lobbyPageDelivered || VERSION === "?" || !lobbyJoinedChannel()) return false;
+
+    const text = `(CD-Companion) Successfully loaded version ${VERSION}`;
+    if (typeof window.__cdcPage !== "function" || !window.__cdcPage(text)) {
+      // The join line can reach React before the WebSocket observer receives it
+      // only on a client that changed its transport; keep watching in that case.
+      return false;
+    }
+    lobbyPageDelivered = true;
+    if (lobbyPageWatch) lobbyPageWatch.disconnect();
+    note(`lobby page delivered — ${text}`);
+    return true;
+  }
+
+  function watchForLobbyPage() {
+    if (lobbyPageDelivered || !document.body) return;
+    showLobbyPage();
+    if (lobbyPageDelivered || lobbyPageWatch) return;
+    lobbyPageWatch = new MutationObserver(() => showLobbyPage());
+    lobbyPageWatch.observe(document.body, { childList: true, characterData: true, subtree: true });
+  }
+
   // Called from the config handler the moment the version lands; this is the
   // floor under it, for the tab where the bridge never replies at all.
   setTimeout(announce, 3000);
+  watchForLobbyPage();
 })();

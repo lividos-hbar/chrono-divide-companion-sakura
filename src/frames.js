@@ -32,6 +32,50 @@
 
   const TAG = "[cd-companion/frames]";
 
+  /**
+   * Deliver a local page through the client's existing XWOL message path.
+   *
+   * The lobby has no public "append chat row" API.  Its pages are ordinary
+   * server messages, parsed from the WebSocket before React ever sees them.
+   * Keep the first channel-join packet as a protocol-correct template, then
+   * replay that packet with only its displayed text changed.  This lets the
+   * client create, format, scroll and retire the page exactly as it does an
+   * `(xwol-*) You are away` message — without guessing its private React DOM.
+   *
+   * This must be installed at document_start, before the client creates its
+   * XWOL socket.  It is intentionally limited to text frames that contain the
+   * server's own channel-join line; binary game sockets are never retained or
+   * touched.
+   */
+  const NativeWebSocket = window.WebSocket;
+  let pageTemplate = null;
+  const JOIN_LINE = /You joined channel [^\r\n"\\]+/;
+
+  function rememberPageTemplate(socket, event) {
+    if (pageTemplate || typeof event.data !== "string" || !JOIN_LINE.test(event.data)) return;
+    pageTemplate = { socket, data: event.data };
+  }
+
+  window.__cdcPage = (text) => {
+    if (!NativeWebSocket || !pageTemplate || pageTemplate.socket.readyState !== NativeWebSocket.OPEN) return false;
+    const data = pageTemplate.data.replace(JOIN_LINE, String(text));
+    pageTemplate.socket.dispatchEvent(new MessageEvent("message", { data }));
+    return true;
+  };
+
+  if (NativeWebSocket) {
+    function CompanionWebSocket(...args) {
+      const socket = Reflect.construct(NativeWebSocket, args, NativeWebSocket);
+      socket.addEventListener("message", (event) => rememberPageTemplate(socket, event));
+      return socket;
+    }
+    CompanionWebSocket.prototype = NativeWebSocket.prototype;
+    for (const key of ["CONNECTING", "OPEN", "CLOSING", "CLOSED"]) {
+      Object.defineProperty(CompanionWebSocket, key, { value: NativeWebSocket[key] });
+    }
+    window.WebSocket = CompanionWebSocket;
+  }
+
   /** The interval the pumped frames aim at — 60 a second, what the real one gives. */
   const FRAME_MILLIS = 16;
 

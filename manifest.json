@@ -19,7 +19,10 @@
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
   },
-  "permissions": ["storage", "unlimitedStorage"],
+  "permissions": [
+    "storage",
+    "unlimitedStorage"
+  ],
   "host_permissions": [
     "https://replays-eu.chronodivide.com/*",
     "https://replays-sea.chronodivide.com/*",
@@ -38,7 +41,9 @@
   },
   "background": {
     "service_worker": "src/background.js",
-    "scripts": ["src/background.js"]
+    "scripts": [
+      "src/background.js"
+    ]
   },
   "options_ui": {
     "page": "src/options.html",
@@ -46,21 +51,56 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://game.chronodivide.com/*"],
-      "js": ["src/frames.js", "src/gl-meter.js"],
+      "matches": [
+        "https://game.chronodivide.com/*"
+      ],
+      "js": [
+        "src/frames.js",
+        "src/gl-meter.js"
+      ],
       "run_at": "document_start",
       "world": "MAIN"
     },
     {
-      "matches": ["https://game.chronodivide.com/*"],
-      "js": ["src/glyphs.js", "src/render-tune.js", "src/build-chords.js", "src/queue-predict.js", "src/minimap-qol.js", "src/player-colours.js", "src/mem-readout.js", "src/companion.js", "src/hq-preview.js", "src/replay-sim.js"],
-      "css": ["src/companion.css"],
+      "matches": [
+        "https://game.chronodivide.com/*"
+      ],
+      "js": [
+        "src/glyphs.js",
+        "src/render-tune.js",
+        "src/build-chords.js",
+        "src/queue-predict.js",
+        "src/minimap-qol.js",
+        "src/player-colours.js",
+        "src/mem-readout.js",
+        "src/companion.js",
+        "src/hq-preview.js",
+        "src/replay-sim.js"
+      ],
+      "css": [
+        "src/companion.css"
+      ],
       "run_at": "document_idle",
       "world": "MAIN"
     },
     {
-      "matches": ["https://game.chronodivide.com/*"],
-      "js": ["src/bridge.js"],
+      "matches": [
+        "https://game.chronodivide.com/*"
+      ],
+      "js": [
+        "src/bridge.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://chronodivide.hashflip.app/*",
+        "https://id-preview--55008b0a-8917-4389-bc77-ef41aafb1106.lovable.app/*",
+        "http://localhost:8080/*"
+      ],
+      "js": [
+        "src/site-bridge.js"
+      ],
       "run_at": "document_idle"
     }
   ]
